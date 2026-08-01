@@ -1,0 +1,48 @@
+{
+  "apiVersion": "v1",
+  "requestId": "req_123",
+  "proposedAction": {
+    "id": "pa_123",
+    "type": "EXTERNAL_SEND",
+    "requestedAt": "2026-08-01T19:30:00Z",
+    "actor": {
+      "agentId": "agent_123",
+      "runtimeId": "runtime_456",
+      "sessionId": "session_789"
+    },
+    "delegation": {
+      "delegationId": "del_123",
+      "delegator": {
+        "type": "USER",
+        "id": "user_456"
+      }
+    },
+    "target": {
+      "resourceType": "EMAIL_DRAFT",
+      "resourceId": "draft_123"
+    },
+    "parameters": {
+      "destinationScope": "EXTERNAL",
+      "recipients": ["customer@example.com"]
+    },
+    "payload": {
+      "digest": "sha256:abc123",
+      "classification": ["CONFIDENTIAL"],
+      "sizeBytes": 4280
+    },
+    "authorizationEvidence": [
+      {
+        "type": "USER_INSTRUCTION",
+        "evidenceId": "message_123",
+        "issuedBy": {
+          "type": "RUNTIME",
+          "id": "runtime_456"
+        },
+        "scope": {
+          "actionType": "EXTERNAL_SEND",
+          "destinationScope": "EXTERNAL"
+        }
+      }
+    ]
+  }
+}

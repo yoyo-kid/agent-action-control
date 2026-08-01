@@ -1,0 +1,31 @@
+{
+  "apiVersion": "v1",
+  "requestId": "req_125",
+  "proposedAction": {
+    "id": "pa_125",
+    "type": "DELETE",
+    "requestedAt": "2026-08-01T19:32:00Z",
+    "actor": {
+      "agentId": "agent_123",
+      "runtimeId": "runtime_456"
+    },
+    "delegation": {
+      "delegationId": "del_123",
+      "delegator": {
+        "type": "USER",
+        "id": "user_456"
+      }
+    },
+    "target": {
+      "resourceType": "DOCUMENT",
+      "resourceId": "doc_125"
+    },
+    "parameters": {
+      "deleteMode": "HARD",
+      "recoverable": false
+    },
+    "payload": {
+      "digest": "sha256:delete125"
+    }
+  }
+}

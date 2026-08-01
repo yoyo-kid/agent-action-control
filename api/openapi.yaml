@@ -1,0 +1,747 @@
+openapi: 3.1.0
+info:
+  title: Agent Action Control API
+  version: 0.1.0
+  description: >-
+    Runtime policy and approval control for consequential AI agent actions.
+    Only an ALLOW decision permits the trusted caller to execute the exact
+    proposed action represented by the returned action digest.
+  license:
+    name: Apache 2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Action decisions
+    description: Evaluate immutable proposed actions before execution.
+security:
+  - RuntimeBearerAuth: []
+paths:
+  /v1/action-decisions:
+    post:
+      tags: [Action decisions]
+      summary: Evaluate a proposed action
+      description: >-
+        Evaluates one immutable proposed action. Policy-level denials are
+        successful evaluations and therefore return HTTP 200 with decision
+        DENY. The caller must fail closed on every transport or service error.
+      operationId: evaluateAction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateActionRequest'
+            examples:
+              externalSend:
+                $ref: '#/components/examples/ExternalSendRequest'
+              changeSharing:
+                $ref: '#/components/examples/ChangeSharingRequest'
+              delete:
+                $ref: '#/components/examples/DeleteRequest'
+      responses:
+        '200':
+          description: The authoritative policy decision for this proposed action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionResponse'
+              examples:
+                directAllow:
+                  $ref: '#/components/examples/DirectAllow'
+                terminalDeny:
+                  $ref: '#/components/examples/TerminalDeny'
+                approvalRequired:
+                  $ref: '#/components/examples/ApprovalRequired'
+                safetyReview:
+                  $ref: '#/components/examples/SafetyReview'
+                failClosed:
+                  $ref: '#/components/examples/FailClosed'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/RuntimeNotAuthorized'
+        '409':
+          $ref: '#/components/responses/ActionIDConflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    RuntimeBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: runtime-token
+      description: >-
+        Authenticates the trusted agent runtime. Runtime identity is derived
+        from this credential rather than trusted solely from request fields.
+  responses:
+    MalformedRequest:
+      description: The body is not valid JSON or cannot be decoded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: MALFORMED_REQUEST
+              message: The request body is not valid JSON.
+    AuthenticationRequired:
+      description: A valid runtime credential is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: AUTHENTICATION_REQUIRED
+              message: Runtime authentication is required.
+    RuntimeNotAuthorized:
+      description: The authenticated caller cannot evaluate for this runtime.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: RUNTIME_NOT_AUTHORIZED
+              message: The caller is not authorized for this runtime.
+    ActionIDConflict:
+      description: The proposed action ID is already bound to a different digest.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
+              message: The proposed action ID is already bound to different content.
+              details:
+                - field: proposedAction.id
+                  code: IDEMPOTENCY_CONFLICT
+    ValidationFailed:
+      description: JSON was decoded but one or more contract constraints failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: VALIDATION_FAILED
+              message: The proposed action is invalid.
+              details:
+                - field: proposedAction.parameters.recipients
+                  code: REQUIRED
+    InternalError:
+      description: The service could not produce and commit an authoritative decision.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            apiVersion: v1
+            requestId: req_123
+            error:
+              code: INTERNAL_ERROR
+              message: No authoritative decision was produced.
+  schemas:
+    EvaluateActionRequest:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, requestId, proposedAction]
+      properties:
+        apiVersion:
+          type: string
+          const: v1
+        requestId:
+          $ref: '#/components/schemas/Identifier'
+        proposedAction:
+          $ref: '#/components/schemas/ProposedAction'
+    ProposedAction:
+      oneOf:
+        - $ref: '#/components/schemas/ExternalSendProposedAction'
+        - $ref: '#/components/schemas/ChangeSharingProposedAction'
+        - $ref: '#/components/schemas/DeleteProposedAction'
+      discriminator:
+        propertyName: type
+        mapping:
+          EXTERNAL_SEND: '#/components/schemas/ExternalSendProposedAction'
+          CHANGE_SHARING: '#/components/schemas/ChangeSharingProposedAction'
+          DELETE: '#/components/schemas/DeleteProposedAction'
+    ProposedActionBase:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - requestedAt
+        - actor
+        - delegation
+        - target
+        - parameters
+        - payload
+      properties:
+        id:
+          $ref: '#/components/schemas/Identifier'
+        type:
+          $ref: '#/components/schemas/ProposedActionType'
+        requestedAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/Actor'
+        delegation:
+          $ref: '#/components/schemas/Delegation'
+        target:
+          $ref: '#/components/schemas/Target'
+        parameters:
+          type: object
+        payload:
+          $ref: '#/components/schemas/Payload'
+        authorizationEvidence:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AuthorizationEvidence'
+    ExternalSendProposedAction:
+      allOf:
+        - $ref: '#/components/schemas/ProposedActionBase'
+        - type: object
+          properties:
+            type:
+              const: EXTERNAL_SEND
+            parameters:
+              $ref: '#/components/schemas/ExternalSendParameters'
+    ChangeSharingProposedAction:
+      allOf:
+        - $ref: '#/components/schemas/ProposedActionBase'
+        - type: object
+          properties:
+            type:
+              const: CHANGE_SHARING
+            parameters:
+              $ref: '#/components/schemas/ChangeSharingParameters'
+    DeleteProposedAction:
+      allOf:
+        - $ref: '#/components/schemas/ProposedActionBase'
+        - type: object
+          properties:
+            type:
+              const: DELETE
+            parameters:
+              $ref: '#/components/schemas/DeleteParameters'
+    ProposedActionType:
+      type: string
+      enum: [EXTERNAL_SEND, CHANGE_SHARING, DELETE]
+    Actor:
+      type: object
+      additionalProperties: false
+      required: [agentId, runtimeId]
+      properties:
+        agentId:
+          $ref: '#/components/schemas/Identifier'
+        runtimeId:
+          $ref: '#/components/schemas/Identifier'
+        sessionId:
+          $ref: '#/components/schemas/Identifier'
+    Delegation:
+      type: object
+      additionalProperties: false
+      required: [delegationId, delegator]
+      properties:
+        delegationId:
+          $ref: '#/components/schemas/Identifier'
+        delegator:
+          $ref: '#/components/schemas/Principal'
+    Principal:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [USER, AGENT, RUNTIME, SERVICE]
+        id:
+          $ref: '#/components/schemas/Identifier'
+    Target:
+      type: object
+      additionalProperties: false
+      required: [resourceType, resourceId]
+      properties:
+        resourceType:
+          type: string
+          minLength: 1
+          maxLength: 128
+        resourceId:
+          $ref: '#/components/schemas/Identifier'
+    Payload:
+      type: object
+      additionalProperties: false
+      required: [digest]
+      properties:
+        digest:
+          $ref: '#/components/schemas/Digest'
+        classification:
+          type: array
+          uniqueItems: true
+          maxItems: 32
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+    AuthorizationEvidence:
+      type: object
+      additionalProperties: false
+      required: [type, evidenceId, issuedBy, scope]
+      properties:
+        type:
+          type: string
+          enum: [USER_INSTRUCTION, DELEGATION_GRANT, SYSTEM_ASSERTION]
+        evidenceId:
+          $ref: '#/components/schemas/Identifier'
+        issuedBy:
+          $ref: '#/components/schemas/Principal'
+        scope:
+          $ref: '#/components/schemas/AuthorizationScope'
+    AuthorizationScope:
+      type: object
+      additionalProperties: false
+      required: [actionType]
+      properties:
+        actionType:
+          $ref: '#/components/schemas/ProposedActionType'
+        destinationScope:
+          type: string
+          minLength: 1
+          maxLength: 128
+        requestedScope:
+          type: string
+          minLength: 1
+          maxLength: 128
+        deleteMode:
+          type: string
+          minLength: 1
+          maxLength: 128
+    ExternalSendParameters:
+      type: object
+      additionalProperties: false
+      required: [destinationScope, recipients]
+      properties:
+        destinationScope:
+          type: string
+          enum: [INTERNAL, EXTERNAL]
+        recipients:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 320
+    ChangeSharingParameters:
+      type: object
+      additionalProperties: false
+      required: [currentScope, requestedScope]
+      properties:
+        currentScope:
+          type: string
+          minLength: 1
+          maxLength: 128
+        requestedScope:
+          type: string
+          minLength: 1
+          maxLength: 128
+        targetPrincipals:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Principal'
+    DeleteParameters:
+      type: object
+      additionalProperties: false
+      required: [deleteMode, recoverable]
+      properties:
+        deleteMode:
+          type: string
+          enum: [SOFT, HARD]
+        recoverable:
+          type: boolean
+    DecisionResponse:
+      oneOf:
+        - $ref: '#/components/schemas/AllowDecisionResponse'
+        - $ref: '#/components/schemas/DenyDecisionResponse'
+      discriminator:
+        propertyName: decision
+        mapping:
+          ALLOW: '#/components/schemas/AllowDecisionResponse'
+          DENY: '#/components/schemas/DenyDecisionResponse'
+    DecisionResponseBase:
+      type: object
+      additionalProperties: false
+      required:
+        - apiVersion
+        - decisionId
+        - proposedActionId
+        - actionDigest
+        - decision
+        - reasonCodes
+        - actions
+        - policy
+        - evaluatedAt
+      properties:
+        apiVersion:
+          type: string
+          const: v1
+        decisionId:
+          $ref: '#/components/schemas/Identifier'
+        proposedActionId:
+          $ref: '#/components/schemas/Identifier'
+        actionDigest:
+          $ref: '#/components/schemas/Digest'
+        decision:
+          type: string
+          enum: [ALLOW, DENY]
+        reasonCodes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ReasonCode'
+        actions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/DecisionAction'
+        policy:
+          $ref: '#/components/schemas/PolicyMetadata'
+        evaluatedAt:
+          type: string
+          format: date-time
+    AllowDecisionResponse:
+      allOf:
+        - $ref: '#/components/schemas/DecisionResponseBase'
+        - type: object
+          properties:
+            decision:
+              const: ALLOW
+            actions:
+              type: array
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/CreateSafetyReviewAction'
+    DenyDecisionResponse:
+      allOf:
+        - $ref: '#/components/schemas/DecisionResponseBase'
+        - type: object
+          properties:
+            decision:
+              const: DENY
+            actions:
+              type: array
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/DecisionAction'
+    DecisionAction:
+      oneOf:
+        - $ref: '#/components/schemas/RequireApprovalAction'
+        - $ref: '#/components/schemas/CreateSafetyReviewAction'
+      discriminator:
+        propertyName: type
+        mapping:
+          REQUIRE_APPROVAL: '#/components/schemas/RequireApprovalAction'
+          CREATE_SAFETY_REVIEW: '#/components/schemas/CreateSafetyReviewAction'
+    RequireApprovalAction:
+      type: object
+      additionalProperties: false
+      required: [actionId, type, context]
+      properties:
+        actionId:
+          $ref: '#/components/schemas/Identifier'
+        type:
+          const: REQUIRE_APPROVAL
+        context:
+          $ref: '#/components/schemas/RequireApprovalContext'
+    RequireApprovalContext:
+      type: object
+      additionalProperties: false
+      required: [approvalRequestId, requiredAuthority, actionDigest, expiresAt]
+      properties:
+        approvalRequestId:
+          $ref: '#/components/schemas/Identifier'
+        requiredAuthority:
+          $ref: '#/components/schemas/RequiredAuthority'
+        actionDigest:
+          $ref: '#/components/schemas/Digest'
+        expiresAt:
+          type: string
+          format: date-time
+    RequiredAuthority:
+      type: object
+      additionalProperties: false
+      required: [type, principalId]
+      properties:
+        type:
+          type: string
+          const: DELEGATOR
+        principalId:
+          $ref: '#/components/schemas/Identifier'
+    CreateSafetyReviewAction:
+      type: object
+      additionalProperties: false
+      required: [actionId, type, context]
+      properties:
+        actionId:
+          $ref: '#/components/schemas/Identifier'
+        type:
+          const: CREATE_SAFETY_REVIEW
+        context:
+          $ref: '#/components/schemas/CreateSafetyReviewContext'
+    CreateSafetyReviewContext:
+      type: object
+      additionalProperties: false
+      required: [reviewRequestId, priority]
+      properties:
+        reviewRequestId:
+          $ref: '#/components/schemas/Identifier'
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        evidenceRefs:
+          type: array
+          uniqueItems: true
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Identifier'
+    PolicyMetadata:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ReasonCode:
+      type: string
+      enum:
+        - EXISTING_DELEGATION_SUFFICIENT
+        - DELEGATOR_APPROVAL_REQUIRED
+        - EXTERNAL_DESTINATION
+        - VISIBILITY_EXPANSION
+        - DESTRUCTIVE_OPERATION
+        - ACTOR_NOT_AUTHORIZED
+        - DELEGATOR_APPROVAL_VERIFIED
+        - APPROVAL_REJECTED
+        - APPROVAL_EXPIRED
+        - ACTION_DIGEST_MISMATCH
+        - ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
+        - SAFETY_REVIEW_REQUESTED
+        - POLICY_UNAVAILABLE
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, error]
+      properties:
+        apiVersion:
+          type: string
+          const: v1
+        requestId:
+          $ref: '#/components/schemas/Identifier'
+        error:
+          $ref: '#/components/schemas/ErrorPayload'
+    ErrorPayload:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - MALFORMED_REQUEST
+            - AUTHENTICATION_REQUIRED
+            - RUNTIME_NOT_AUTHORIZED
+            - ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
+            - VALIDATION_FAILED
+            - INTERNAL_ERROR
+        message:
+          type: string
+          minLength: 1
+          maxLength: 512
+        details:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        field:
+          type: string
+          minLength: 1
+          maxLength: 256
+        code:
+          type: string
+          minLength: 1
+          maxLength: 128
+    Identifier:
+      type: string
+      minLength: 1
+      maxLength: 256
+    Digest:
+      type: string
+      pattern: '^sha256:[A-Za-z0-9_-]+$'
+      minLength: 8
+      maxLength: 128
+  examples:
+    ExternalSendRequest:
+      summary: Send classified content to an external recipient.
+      value:
+        apiVersion: v1
+        requestId: req_123
+        proposedAction:
+          id: pa_123
+          type: EXTERNAL_SEND
+          requestedAt: '2026-08-01T19:30:00Z'
+          actor:
+            agentId: agent_123
+            runtimeId: runtime_456
+            sessionId: session_789
+          delegation:
+            delegationId: del_123
+            delegator: {type: USER, id: user_456}
+          target: {resourceType: EMAIL_DRAFT, resourceId: draft_123}
+          parameters:
+            destinationScope: EXTERNAL
+            recipients: [customer@example.com]
+          payload:
+            digest: sha256:abc123
+            classification: [CONFIDENTIAL]
+            sizeBytes: 4280
+          authorizationEvidence:
+            - type: USER_INSTRUCTION
+              evidenceId: message_123
+              issuedBy: {type: RUNTIME, id: runtime_456}
+              scope:
+                actionType: EXTERNAL_SEND
+                destinationScope: EXTERNAL
+    ChangeSharingRequest:
+      summary: Expand a document from private to public visibility.
+      value:
+        apiVersion: v1
+        requestId: req_124
+        proposedAction:
+          id: pa_124
+          type: CHANGE_SHARING
+          requestedAt: '2026-08-01T19:31:00Z'
+          actor: {agentId: agent_123, runtimeId: runtime_456}
+          delegation:
+            delegationId: del_123
+            delegator: {type: USER, id: user_456}
+          target: {resourceType: DOCUMENT, resourceId: doc_124}
+          parameters: {currentScope: PRIVATE, requestedScope: PUBLIC}
+          payload: {digest: sha256:share124}
+    DeleteRequest:
+      summary: Permanently delete a resource.
+      value:
+        apiVersion: v1
+        requestId: req_125
+        proposedAction:
+          id: pa_125
+          type: DELETE
+          requestedAt: '2026-08-01T19:32:00Z'
+          actor: {agentId: agent_123, runtimeId: runtime_456}
+          delegation:
+            delegationId: del_123
+            delegator: {type: USER, id: user_456}
+          target: {resourceType: DOCUMENT, resourceId: doc_125}
+          parameters: {deleteMode: HARD, recoverable: false}
+          payload: {digest: sha256:delete125}
+    DirectAllow:
+      value:
+        apiVersion: v1
+        decisionId: dec_100
+        proposedActionId: pa_100
+        actionDigest: sha256:allow100
+        decision: ALLOW
+        reasonCodes: [EXISTING_DELEGATION_SUFFICIENT]
+        actions: []
+        policy: {version: policy-2026-08-01.1}
+        evaluatedAt: '2026-08-01T19:30:00Z'
+    TerminalDeny:
+      value:
+        apiVersion: v1
+        decisionId: dec_101
+        proposedActionId: pa_101
+        actionDigest: sha256:deny101
+        decision: DENY
+        reasonCodes: [ACTOR_NOT_AUTHORIZED]
+        actions: []
+        policy: {version: policy-2026-08-01.1}
+        evaluatedAt: '2026-08-01T19:31:00Z'
+    ApprovalRequired:
+      value:
+        apiVersion: v1
+        decisionId: dec_102
+        proposedActionId: pa_102
+        actionDigest: sha256:approval102
+        decision: DENY
+        reasonCodes: [DELEGATOR_APPROVAL_REQUIRED]
+        actions:
+          - actionId: act_102
+            type: REQUIRE_APPROVAL
+            context:
+              approvalRequestId: apr_102
+              requiredAuthority: {type: DELEGATOR, principalId: user_456}
+              actionDigest: sha256:approval102
+              expiresAt: '2026-08-01T20:00:00Z'
+        policy: {version: policy-2026-08-01.1}
+        evaluatedAt: '2026-08-01T19:32:00Z'
+    SafetyReview:
+      value:
+        apiVersion: v1
+        decisionId: dec_103
+        proposedActionId: pa_103
+        actionDigest: sha256:review103
+        decision: ALLOW
+        reasonCodes: [EXISTING_DELEGATION_SUFFICIENT, SAFETY_REVIEW_REQUESTED]
+        actions:
+          - actionId: act_103
+            type: CREATE_SAFETY_REVIEW
+            context:
+              reviewRequestId: review_103
+              priority: HIGH
+              evidenceRefs: [message_103]
+        policy: {version: policy-2026-08-01.1}
+        evaluatedAt: '2026-08-01T19:33:00Z'
+    FailClosed:
+      value:
+        apiVersion: v1
+        decisionId: dec_104
+        proposedActionId: pa_104
+        actionDigest: sha256:closed104
+        decision: DENY
+        reasonCodes: [POLICY_UNAVAILABLE]
+        actions: []
+        policy: {version: policy-2026-08-01.1}
+        evaluatedAt: '2026-08-01T19:34:00Z'
