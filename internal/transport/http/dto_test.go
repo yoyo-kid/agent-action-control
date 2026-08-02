@@ -16,7 +16,7 @@ func TestEvaluateActionRequestGoldenRoundTrip(t *testing.T) {
 
 	fixtures := []string{
 		"evaluate_external_send_request.json",
-		"evaluate_change_sharing_request.json",
+		"evaluate_update_resource_access_request.json",
 		"evaluate_delete_request.json",
 	}
 	for _, fixture := range fixtures {

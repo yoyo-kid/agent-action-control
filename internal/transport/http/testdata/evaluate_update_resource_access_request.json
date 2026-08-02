@@ -3,7 +3,7 @@
   "requestId": "req_124",
   "proposedAction": {
     "id": "pa_124",
-    "type": "CHANGE_SHARING",
+    "type": "UPDATE_RESOURCE_ACCESS",
     "requestedAt": "2026-08-01T19:31:00Z",
     "actor": {
       "agentId": "agent_123",
@@ -31,7 +31,7 @@
       ]
     },
     "payload": {
-      "digest": "sha256:share124"
+      "digest": "sha256:access124"
     }
   }
 }

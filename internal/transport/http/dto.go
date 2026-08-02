@@ -14,9 +14,9 @@ const APIVersionV1 = "v1"
 type ProposedActionType string
 
 const (
-	ActionExternalSend  ProposedActionType = "EXTERNAL_SEND"
-	ActionChangeSharing ProposedActionType = "CHANGE_SHARING"
-	ActionDelete        ProposedActionType = "DELETE"
+	ActionExternalSend         ProposedActionType = "EXTERNAL_SEND"
+	ActionUpdateResourceAccess ProposedActionType = "UPDATE_RESOURCE_ACCESS"
+	ActionDelete               ProposedActionType = "DELETE"
 )
 
 type DecisionType string
@@ -108,7 +108,7 @@ type ExternalSendParameters struct {
 	Recipients       []string `json:"recipients"`
 }
 
-type ChangeSharingParameters struct {
+type UpdateResourceAccessParameters struct {
 	CurrentScope     string      `json:"currentScope"`
 	RequestedScope   string      `json:"requestedScope"`
 	TargetPrincipals []Principal `json:"targetPrincipals,omitempty"`
@@ -195,8 +195,8 @@ func (action ProposedAction) ValidateParameters() error {
 	switch action.Type {
 	case ActionExternalSend:
 		target = &ExternalSendParameters{}
-	case ActionChangeSharing:
-		target = &ChangeSharingParameters{}
+	case ActionUpdateResourceAccess:
+		target = &UpdateResourceAccessParameters{}
 	case ActionDelete:
 		target = &DeleteParameters{}
 	default:

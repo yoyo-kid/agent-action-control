@@ -36,8 +36,8 @@ paths:
             examples:
               externalSend:
                 $ref: '#/components/examples/ExternalSendRequest'
-              changeSharing:
-                $ref: '#/components/examples/ChangeSharingRequest'
+              updateResourceAccess:
+                $ref: '#/components/examples/UpdateResourceAccessRequest'
               delete:
                 $ref: '#/components/examples/DeleteRequest'
       responses:
@@ -174,13 +174,13 @@ components:
     ProposedAction:
       oneOf:
         - $ref: '#/components/schemas/ExternalSendProposedAction'
-        - $ref: '#/components/schemas/ChangeSharingProposedAction'
+        - $ref: '#/components/schemas/UpdateResourceAccessProposedAction'
         - $ref: '#/components/schemas/DeleteProposedAction'
       discriminator:
         propertyName: type
         mapping:
           EXTERNAL_SEND: '#/components/schemas/ExternalSendProposedAction'
-          CHANGE_SHARING: '#/components/schemas/ChangeSharingProposedAction'
+          UPDATE_RESOURCE_ACCESS: '#/components/schemas/UpdateResourceAccessProposedAction'
           DELETE: '#/components/schemas/DeleteProposedAction'
     ProposedActionBase:
       type: object
@@ -226,15 +226,15 @@ components:
               const: EXTERNAL_SEND
             parameters:
               $ref: '#/components/schemas/ExternalSendParameters'
-    ChangeSharingProposedAction:
+    UpdateResourceAccessProposedAction:
       allOf:
         - $ref: '#/components/schemas/ProposedActionBase'
         - type: object
           properties:
             type:
-              const: CHANGE_SHARING
+              const: UPDATE_RESOURCE_ACCESS
             parameters:
-              $ref: '#/components/schemas/ChangeSharingParameters'
+              $ref: '#/components/schemas/UpdateResourceAccessParameters'
     DeleteProposedAction:
       allOf:
         - $ref: '#/components/schemas/ProposedActionBase'
@@ -246,7 +246,7 @@ components:
               $ref: '#/components/schemas/DeleteParameters'
     ProposedActionType:
       type: string
-      enum: [EXTERNAL_SEND, CHANGE_SHARING, DELETE]
+      enum: [EXTERNAL_SEND, UPDATE_RESOURCE_ACCESS, DELETE]
     Actor:
       type: object
       additionalProperties: false
@@ -357,7 +357,7 @@ components:
             type: string
             minLength: 1
             maxLength: 320
-    ChangeSharingParameters:
+    UpdateResourceAccessParameters:
       type: object
       additionalProperties: false
       required: [currentScope, requestedScope]
@@ -645,14 +645,14 @@ components:
               scope:
                 actionType: EXTERNAL_SEND
                 destinationScope: EXTERNAL
-    ChangeSharingRequest:
-      summary: Expand a document from private to public visibility.
+    UpdateResourceAccessRequest:
+      summary: Update a document's access from private to public visibility.
       value:
         apiVersion: v1
         requestId: req_124
         proposedAction:
           id: pa_124
-          type: CHANGE_SHARING
+          type: UPDATE_RESOURCE_ACCESS
           requestedAt: '2026-08-01T19:31:00Z'
           actor: {agentId: agent_123, runtimeId: runtime_456}
           delegation:
