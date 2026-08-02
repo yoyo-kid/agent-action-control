@@ -1,0 +1,17 @@
+package domain
+
+import "errors"
+
+var (
+	ErrInvalidActionType       = errors.New("invalid action type")
+	ErrInvalidDecisionType     = errors.New("invalid decision type")
+	ErrInvalidPolicyActionType = errors.New("invalid policy action type")
+	ErrInvalidReasonCode       = errors.New("invalid reason code")
+	ErrInvalidPrincipalType    = errors.New("invalid principal type")
+	ErrInvalidDigest           = errors.New("invalid action digest")
+	ErrInvalidArgument         = errors.New("invalid argument")
+
+	ErrAllowCannotRequireApproval = errors.New("allow decision cannot require approval")
+	ErrDuplicatePolicyAction      = errors.New("duplicate policy action type")
+	ErrDuplicateReasonCode        = errors.New("duplicate reason code")
+)
