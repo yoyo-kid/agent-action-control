@@ -42,11 +42,15 @@ func TestNewProposedAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new target: %v", err)
 	}
-	digest, err := ParseActionDigest("sha256:payload123")
+	digest, err := ParsePayloadDigest("sha256:payload123")
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
 	}
 	parameters := testActionParameters{typ: ActionExternalSend, values: []string{"customer@example.com"}}
+	payload, err := NewPayloadFacts(digest, nil, nil)
+	if err != nil {
+		t.Fatalf("new payload: %v", err)
+	}
 
 	action, err := NewProposedAction(
 		"proposed_123",
@@ -56,7 +60,8 @@ func TestNewProposedAction(t *testing.T) {
 		delegation,
 		target,
 		parameters,
-		digest,
+		payload,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("new proposed action: %v", err)
@@ -79,9 +84,13 @@ func TestNewProposedAction(t *testing.T) {
 func TestNewProposedActionRejectsMismatchedParameters(t *testing.T) {
 	t.Parallel()
 
-	digest, err := ParseActionDigest("sha256:payload123")
+	digest, err := ParsePayloadDigest("sha256:payload123")
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
+	}
+	payload, err := NewPayloadFacts(digest, nil, nil)
+	if err != nil {
+		t.Fatalf("new payload: %v", err)
 	}
 	_, err = NewProposedAction(
 		"proposed_123",
@@ -91,7 +100,8 @@ func TestNewProposedActionRejectsMismatchedParameters(t *testing.T) {
 		Delegation{id: "delegation_123", delegator: Principal{typ: PrincipalUser, id: "user_123"}},
 		Target{resourceType: "DOCUMENT", resourceID: "document_123"},
 		testActionParameters{typ: ActionExternalSend},
-		digest,
+		payload,
+		nil,
 	)
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidArgument)

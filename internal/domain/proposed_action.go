@@ -36,16 +36,8 @@ func (typ ActionType) Valid() bool {
 type ActionDigest string
 
 func ParseActionDigest(value string) (ActionDigest, error) {
-	if len(value) < 8 || len(value) > 128 || !strings.HasPrefix(value, "sha256:") {
-		return "", fmt.Errorf("%w: expected sha256 digest", ErrInvalidDigest)
-	}
-	for _, character := range value[len("sha256:"):] {
-		if (character < 'a' || character > 'z') &&
-			(character < 'A' || character > 'Z') &&
-			(character < '0' || character > '9') &&
-			character != '_' && character != '-' {
-			return "", fmt.Errorf("%w: unsupported digest character %q", ErrInvalidDigest, character)
-		}
+	if err := validateSHA256Digest(value); err != nil {
+		return "", err
 	}
 	return ActionDigest(value), nil
 }
@@ -57,6 +49,40 @@ func (digest ActionDigest) Valid() bool {
 
 func (digest ActionDigest) String() string { return string(digest) }
 
+// PayloadDigest identifies the exact raw payload without retaining its content.
+// It is distinct from ActionDigest, which M1-05 computes over the complete
+// normalized action.
+type PayloadDigest string
+
+func ParsePayloadDigest(value string) (PayloadDigest, error) {
+	if err := validateSHA256Digest(value); err != nil {
+		return "", err
+	}
+	return PayloadDigest(value), nil
+}
+
+func (digest PayloadDigest) Valid() bool {
+	_, err := ParsePayloadDigest(string(digest))
+	return err == nil
+}
+
+func (digest PayloadDigest) String() string { return string(digest) }
+
+func validateSHA256Digest(value string) error {
+	if len(value) < 8 || len(value) > 128 || !strings.HasPrefix(value, "sha256:") {
+		return fmt.Errorf("%w: expected sha256 digest", ErrInvalidDigest)
+	}
+	for _, character := range value[len("sha256:"):] {
+		if (character < 'a' || character > 'z') &&
+			(character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') &&
+			character != '_' && character != '-' {
+			return fmt.Errorf("%w: unsupported digest character %q", ErrInvalidDigest, character)
+		}
+	}
+	return nil
+}
+
 // Actor identifies the agent and trusted runtime that proposed an action.
 type Actor struct {
 	agentID   string
@@ -65,13 +91,23 @@ type Actor struct {
 }
 
 func NewActor(agentID, runtimeID, sessionID string) (Actor, error) {
-	if strings.TrimSpace(agentID) == "" {
-		return Actor{}, fmt.Errorf("%w: agent id is required", ErrInvalidArgument)
+	agentID, err := normalizeRequiredIdentifier(agentID, "agent id")
+	if err != nil {
+		return Actor{}, err
 	}
-	if strings.TrimSpace(runtimeID) == "" {
-		return Actor{}, fmt.Errorf("%w: runtime id is required", ErrInvalidArgument)
+	runtimeID, err = normalizeRequiredIdentifier(runtimeID, "runtime id")
+	if err != nil {
+		return Actor{}, err
 	}
-	return Actor{agentID: agentID, runtimeID: runtimeID, sessionID: sessionID}, nil
+	sessionID, err = normalizeOptionalIdentifier(sessionID, "session id")
+	if err != nil {
+		return Actor{}, err
+	}
+	return Actor{
+		agentID:   agentID,
+		runtimeID: runtimeID,
+		sessionID: sessionID,
+	}, nil
 }
 
 func (actor Actor) AgentID() string   { return actor.agentID }
@@ -93,14 +129,15 @@ type ActionParameters interface {
 
 // ProposedAction is an immutable description of an intended side effect.
 type ProposedAction struct {
-	id            string
-	typ           ActionType
-	requestedAt   time.Time
-	actor         Actor
-	delegation    Delegation
-	target        Target
-	parameters    ActionParameters
-	payloadDigest ActionDigest
+	id          string
+	typ         ActionType
+	requestedAt time.Time
+	actor       Actor
+	delegation  Delegation
+	target      Target
+	parameters  ActionParameters
+	payload     PayloadFacts
+	evidence    []AuthorizationEvidence
 }
 
 func NewProposedAction(
@@ -111,10 +148,12 @@ func NewProposedAction(
 	delegation Delegation,
 	target Target,
 	parameters ActionParameters,
-	payloadDigest ActionDigest,
+	payload PayloadFacts,
+	evidence []AuthorizationEvidence,
 ) (ProposedAction, error) {
-	if strings.TrimSpace(id) == "" {
-		return ProposedAction{}, fmt.Errorf("%w: proposed action id is required", ErrInvalidArgument)
+	id, err := normalizeRequiredIdentifier(id, "proposed action id")
+	if err != nil {
+		return ProposedAction{}, err
 	}
 	if !typ.Valid() {
 		return ProposedAction{}, fmt.Errorf("%w: %q", ErrInvalidActionType, typ)
@@ -140,18 +179,24 @@ func NewProposedAction(
 	if err := parameters.validate(); err != nil {
 		return ProposedAction{}, err
 	}
-	if !payloadDigest.Valid() {
+	if !payload.valid() {
 		return ProposedAction{}, ErrInvalidDigest
 	}
+	for _, item := range evidence {
+		if !item.valid() {
+			return ProposedAction{}, fmt.Errorf("%w: invalid authorization evidence", ErrInvalidArgument)
+		}
+	}
 	return ProposedAction{
-		id:            id,
-		typ:           typ,
-		requestedAt:   requestedAt,
-		actor:         actor,
-		delegation:    delegation,
-		target:        target,
-		parameters:    parameters.clone(),
-		payloadDigest: payloadDigest,
+		id:          id,
+		typ:         typ,
+		requestedAt: requestedAt.UTC(),
+		actor:       actor,
+		delegation:  delegation,
+		target:      target,
+		parameters:  parameters.clone(),
+		payload:     payload.clone(),
+		evidence:    cloneAuthorizationEvidence(evidence),
 	}, nil
 }
 
@@ -167,4 +212,8 @@ func (action ProposedAction) Parameters() ActionParameters {
 	}
 	return action.parameters.clone()
 }
-func (action ProposedAction) PayloadDigest() ActionDigest { return action.payloadDigest }
+func (action ProposedAction) Payload() PayloadFacts        { return action.payload.clone() }
+func (action ProposedAction) PayloadDigest() PayloadDigest { return action.payload.Digest() }
+func (action ProposedAction) AuthorizationEvidence() []AuthorizationEvidence {
+	return cloneAuthorizationEvidence(action.evidence)
+}
