@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1",
+  "decisionId": "dec_103",
+  "proposedActionId": "pa_103",
+  "actionDigest": "sha256:review103",
+  "decision": "ALLOW",
+  "reasonCodes": [
+    "EXISTING_DELEGATION_SUFFICIENT",
+    "SAFETY_REVIEW_REQUESTED"
+  ],
+  "actions": [
+    {
+      "actionId": "act_103",
+      "type": "CREATE_SAFETY_REVIEW",
+      "context": {
+        "reviewRequestId": "review_103",
+        "priority": "HIGH",
+        "evidenceRefs": ["message_103"]
+      }
+    }
+  ],
+  "policy": {"version": "policy-2026-08-01.1"},
+  "evaluatedAt": "2026-08-01T19:33:00Z"
+}

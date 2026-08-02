@@ -1,0 +1,25 @@
+{
+  "apiVersion": "v1",
+  "decisionId": "dec_102",
+  "proposedActionId": "pa_102",
+  "actionDigest": "sha256:approval102",
+  "decision": "DENY",
+  "reasonCodes": ["DELEGATOR_APPROVAL_REQUIRED"],
+  "actions": [
+    {
+      "actionId": "act_102",
+      "type": "REQUIRE_APPROVAL",
+      "context": {
+        "approvalRequestId": "apr_102",
+        "requiredAuthority": {
+          "type": "DELEGATOR",
+          "principalId": "user_456"
+        },
+        "actionDigest": "sha256:approval102",
+        "expiresAt": "2026-08-01T20:00:00Z"
+      }
+    }
+  ],
+  "policy": {"version": "policy-2026-08-01.1"},
+  "evaluatedAt": "2026-08-01T19:32:00Z"
+}

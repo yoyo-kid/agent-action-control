@@ -1,0 +1,11 @@
+{
+  "apiVersion": "v1",
+  "decisionId": "dec_101",
+  "proposedActionId": "pa_101",
+  "actionDigest": "sha256:deny101",
+  "decision": "DENY",
+  "reasonCodes": ["ACTOR_NOT_AUTHORIZED"],
+  "actions": [],
+  "policy": {"version": "policy-2026-08-01.1"},
+  "evaluatedAt": "2026-08-01T19:31:00Z"
+}

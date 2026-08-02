@@ -1,0 +1,37 @@
+{
+  "apiVersion": "v1",
+  "requestId": "req_124",
+  "proposedAction": {
+    "id": "pa_124",
+    "type": "UPDATE_RESOURCE_ACCESS",
+    "requestedAt": "2026-08-01T19:31:00Z",
+    "actor": {
+      "agentId": "agent_123",
+      "runtimeId": "runtime_456"
+    },
+    "delegation": {
+      "delegationId": "del_123",
+      "delegator": {
+        "type": "USER",
+        "id": "user_456"
+      }
+    },
+    "target": {
+      "resourceType": "DOCUMENT",
+      "resourceId": "doc_124"
+    },
+    "parameters": {
+      "currentScope": "PRIVATE",
+      "requestedScope": "SHARED",
+      "targetPrincipals": [
+        {
+          "type": "USER",
+          "id": "user_789"
+        }
+      ]
+    },
+    "payload": {
+      "digest": "sha256:access124"
+    }
+  }
+}

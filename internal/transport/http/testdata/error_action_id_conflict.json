@@ -1,0 +1,14 @@
+{
+  "apiVersion": "v1",
+  "requestId": "req_123",
+  "error": {
+    "code": "ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT",
+    "message": "The proposed action ID is already bound to different content.",
+    "details": [
+      {
+        "field": "proposedAction.id",
+        "code": "IDEMPOTENCY_CONFLICT"
+      }
+    ]
+  }
+}
