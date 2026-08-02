@@ -44,7 +44,6 @@ func TestDecisionResponseGoldenRoundTrip(t *testing.T) {
 		"decision_allow.json",
 		"decision_deny.json",
 		"decision_approval_required.json",
-		"decision_safety_review.json",
 		"decision_fail_closed.json",
 	}
 	for _, fixture := range fixtures {
@@ -117,14 +116,16 @@ func TestDecisionResponseRejectsUnknownValues(t *testing.T) {
 	tests := []struct {
 		name     string
 		decision httptransport.DecisionType
+		reasons  []string
 		actions  []httptransport.DecisionAction
 	}{
 		{name: "decision", decision: "REVIEW"},
 		{
-			name:     "action",
+			name:     "internal safety-review effect is not a public action",
 			decision: httptransport.DecisionDeny,
+			reasons:  []string{"POLICY_UNAVAILABLE"},
 			actions: []httptransport.DecisionAction{{
-				Type:    "WARN",
+				Type:    "CREATE_SAFETY_REVIEW",
 				Context: json.RawMessage(`{}`),
 			}},
 		},
@@ -134,9 +135,10 @@ func TestDecisionResponseRejectsUnknownValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			response := httptransport.DecisionResponse{
-				APIVersion: httptransport.APIVersionV1,
-				Decision:   test.decision,
-				Actions:    test.actions,
+				APIVersion:  httptransport.APIVersionV1,
+				Decision:    test.decision,
+				ReasonCodes: test.reasons,
+				Actions:     test.actions,
 			}
 			if err := response.Validate(); err == nil {
 				t.Fatal("expected validation error")
@@ -163,6 +165,38 @@ func TestDecisionResponseRejectsAllowWithApproval(t *testing.T) {
 	}
 	if err := response.Validate(); err == nil {
 		t.Fatal("expected ALLOW + REQUIRE_APPROVAL to be rejected")
+	}
+}
+
+func TestDecisionResponseReasonRequirements(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		decision httptransport.DecisionType
+		reasons  []string
+		wantErr  bool
+	}{
+		{name: "normal allow has no reasons", decision: httptransport.DecisionAllow},
+		{name: "allow reason unsupported in v1", decision: httptransport.DecisionAllow, reasons: []string{"POLICY_UNAVAILABLE_FAIL_OPEN"}, wantErr: true},
+		{name: "deny requires reason", decision: httptransport.DecisionDeny, wantErr: true},
+		{name: "deny with reason", decision: httptransport.DecisionDeny, reasons: []string{"ACTOR_NOT_AUTHORIZED"}},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			response := httptransport.DecisionResponse{
+				APIVersion:  httptransport.APIVersionV1,
+				Decision:    test.decision,
+				ReasonCodes: test.reasons,
+			}
+			err := response.Validate()
+			if (err != nil) != test.wantErr {
+				t.Fatalf("error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
 	}
 }
 

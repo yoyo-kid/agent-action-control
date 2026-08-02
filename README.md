@@ -5,8 +5,10 @@ Agent Action Control is an open-source runtime control point for consequential A
 The MVP contract intentionally stays small:
 
 - Decisions are `ALLOW` or `DENY`.
-- Follow-up actions are `REQUIRE_APPROVAL` or `CREATE_SAFETY_REVIEW`.
+- The only public follow-up action is `REQUIRE_APPROVAL`.
+- `CREATE_SAFETY_REVIEW` is an internal asynchronous policy effect owned by the service.
 - Only `ALLOW` permits upstream execution.
+- Normal `ALLOW` responses contain empty `reasonCodes` and `actions` arrays.
 
 The first milestone implements the synchronous decision endpoint and its minimal SQLite ledger. Delegator approval callbacks and execution outcome reporting follow in later milestones.
 

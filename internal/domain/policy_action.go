@@ -10,8 +10,7 @@ import (
 type PolicyActionType string
 
 const (
-	PolicyActionRequireApproval    PolicyActionType = "REQUIRE_APPROVAL"
-	PolicyActionCreateSafetyReview PolicyActionType = "CREATE_SAFETY_REVIEW"
+	PolicyActionRequireApproval PolicyActionType = "REQUIRE_APPROVAL"
 )
 
 func ParsePolicyActionType(value string) (PolicyActionType, error) {
@@ -23,7 +22,7 @@ func ParsePolicyActionType(value string) (PolicyActionType, error) {
 }
 
 func (typ PolicyActionType) Valid() bool {
-	return typ == PolicyActionRequireApproval || typ == PolicyActionCreateSafetyReview
+	return typ == PolicyActionRequireApproval
 }
 
 // PolicyAction is a closed set of typed instructions returned with a decision.
@@ -123,98 +122,6 @@ func (action RequireApprovalAction) validate() error {
 		action.requirement.authority.typ != RequiredAuthorityDelegator ||
 		!action.requirement.actionDigest.Valid() || action.requirement.expiresAt.IsZero() {
 		return fmt.Errorf("%w: invalid approval requirement", ErrInvalidArgument)
-	}
-	return nil
-}
-
-// SafetyReviewPriority controls asynchronous review urgency.
-type SafetyReviewPriority string
-
-const (
-	SafetyReviewLow      SafetyReviewPriority = "LOW"
-	SafetyReviewMedium   SafetyReviewPriority = "MEDIUM"
-	SafetyReviewHigh     SafetyReviewPriority = "HIGH"
-	SafetyReviewCritical SafetyReviewPriority = "CRITICAL"
-)
-
-func (priority SafetyReviewPriority) Valid() bool {
-	switch priority {
-	case SafetyReviewLow, SafetyReviewMedium, SafetyReviewHigh, SafetyReviewCritical:
-		return true
-	default:
-		return false
-	}
-}
-
-type SafetyReviewRequirement struct {
-	reviewRequestID string
-	priority        SafetyReviewPriority
-	evidenceRefs    []string
-}
-
-func NewSafetyReviewRequirement(
-	reviewRequestID string,
-	priority SafetyReviewPriority,
-	evidenceRefs []string,
-) (SafetyReviewRequirement, error) {
-	if strings.TrimSpace(reviewRequestID) == "" {
-		return SafetyReviewRequirement{}, fmt.Errorf("%w: review request id is required", ErrInvalidArgument)
-	}
-	if !priority.Valid() {
-		return SafetyReviewRequirement{}, fmt.Errorf("%w: invalid safety review priority %q", ErrInvalidArgument, priority)
-	}
-	seenEvidence := make(map[string]struct{}, len(evidenceRefs))
-	for _, ref := range evidenceRefs {
-		if strings.TrimSpace(ref) == "" {
-			return SafetyReviewRequirement{}, fmt.Errorf("%w: evidence reference cannot be empty", ErrInvalidArgument)
-		}
-		if _, exists := seenEvidence[ref]; exists {
-			return SafetyReviewRequirement{}, fmt.Errorf("%w: duplicate evidence reference %q", ErrInvalidArgument, ref)
-		}
-		seenEvidence[ref] = struct{}{}
-	}
-	return SafetyReviewRequirement{
-		reviewRequestID: reviewRequestID,
-		priority:        priority,
-		evidenceRefs:    append([]string(nil), evidenceRefs...),
-	}, nil
-}
-
-func (requirement SafetyReviewRequirement) ReviewRequestID() string {
-	return requirement.reviewRequestID
-}
-func (requirement SafetyReviewRequirement) Priority() SafetyReviewPriority {
-	return requirement.priority
-}
-func (requirement SafetyReviewRequirement) EvidenceRefs() []string {
-	return append([]string(nil), requirement.evidenceRefs...)
-}
-
-type CreateSafetyReviewAction struct {
-	id          string
-	requirement SafetyReviewRequirement
-}
-
-func NewCreateSafetyReviewAction(id string, requirement SafetyReviewRequirement) (CreateSafetyReviewAction, error) {
-	action := CreateSafetyReviewAction{id: id, requirement: requirement}
-	if err := action.validate(); err != nil {
-		return CreateSafetyReviewAction{}, err
-	}
-	return action, nil
-}
-
-func (action CreateSafetyReviewAction) ID() string             { return action.id }
-func (action CreateSafetyReviewAction) Type() PolicyActionType { return PolicyActionCreateSafetyReview }
-func (action CreateSafetyReviewAction) Requirement() SafetyReviewRequirement {
-	return action.requirement
-}
-func (CreateSafetyReviewAction) isPolicyAction() {}
-func (action CreateSafetyReviewAction) validate() error {
-	if strings.TrimSpace(action.id) == "" {
-		return fmt.Errorf("%w: policy action id is required", ErrInvalidArgument)
-	}
-	if strings.TrimSpace(action.requirement.reviewRequestID) == "" || !action.requirement.priority.Valid() {
-		return fmt.Errorf("%w: invalid safety review requirement", ErrInvalidArgument)
 	}
 	return nil
 }

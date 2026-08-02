@@ -17,6 +17,7 @@ func TestParseTypesRejectUnknownValues(t *testing.T) {
 		{name: "proposed action", parse: func() error { _, err := ParseActionType("TRANSFER_FUNDS"); return err }, want: ErrInvalidActionType},
 		{name: "decision", parse: func() error { _, err := ParseDecisionType("REVIEW"); return err }, want: ErrInvalidDecisionType},
 		{name: "policy action", parse: func() error { _, err := ParsePolicyActionType("WARN"); return err }, want: ErrInvalidPolicyActionType},
+		{name: "policy effect", parse: func() error { _, err := ParsePolicyEffectType("NOTIFY"); return err }, want: ErrInvalidPolicyEffectType},
 		{name: "reason code", parse: func() error { _, err := ParseReasonCode("UNKNOWN_REASON"); return err }, want: ErrInvalidReasonCode},
 	}
 
@@ -31,33 +32,34 @@ func TestParseTypesRejectUnknownValues(t *testing.T) {
 	}
 }
 
-func TestDecisionCompositionInvariants(t *testing.T) {
+func TestAllowDecisionHasNoReasonsOrUpstreamActions(t *testing.T) {
+	t.Parallel()
+
+	decision := NewAllowDecision()
+	if decision.Type() != DecisionAllow {
+		t.Fatalf("decision type = %q, want %q", decision.Type(), DecisionAllow)
+	}
+	if got := decision.ReasonCodes(); len(got) != 0 {
+		t.Fatalf("allow reasons = %v, want none", got)
+	}
+	if got := decision.Actions(); len(got) != 0 {
+		t.Fatalf("allow actions = %v, want none", got)
+	}
+}
+
+func TestDenyDecisionComposition(t *testing.T) {
 	t.Parallel()
 
 	approval := mustApprovalAction(t)
-	review := mustSafetyReviewAction(t)
-
-	allow, err := NewAllowDecision(
-		[]ReasonCode{ReasonExistingDelegationSufficient},
-		[]CreateSafetyReviewAction{review},
-	)
-	if err != nil {
-		t.Fatalf("new allow decision: %v", err)
-	}
-	if allow.Type() != DecisionAllow || allow.Actions()[0].Type() != PolicyActionCreateSafetyReview {
-		t.Fatalf("unexpected allow decision: type=%q actions=%v", allow.Type(), allow.Actions())
-	}
-
-	denyCases := []struct {
+	tests := []struct {
 		name    string
 		actions []PolicyAction
 	}{
 		{name: "terminal deny"},
 		{name: "deny requiring approval", actions: []PolicyAction{approval}},
-		{name: "deny creating safety review", actions: []PolicyAction{review}},
-		{name: "deny with both actions", actions: []PolicyAction{approval, review}},
 	}
-	for _, test := range denyCases {
+
+	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -72,7 +74,7 @@ func TestDecisionCompositionInvariants(t *testing.T) {
 	}
 }
 
-func TestDecisionRejectsInvalidMembers(t *testing.T) {
+func TestDenyDecisionRejectsInvalidMembers(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -98,7 +100,7 @@ func TestDecisionRejectsInvalidMembers(t *testing.T) {
 	}
 }
 
-func TestDecisionNormalizesRepeatedInputs(t *testing.T) {
+func TestDenyDecisionNormalizesRepeatedInputs(t *testing.T) {
 	t.Parallel()
 
 	firstApproval := mustApprovalAction(t)
@@ -118,32 +120,32 @@ func TestDecisionNormalizesRepeatedInputs(t *testing.T) {
 		t.Fatalf("normalized reasons = %v", got)
 	}
 	if got := decision.Actions(); len(got) != 2 {
-		t.Fatalf("actions = %v, want both distinct approval requirements preserved for composition", got)
+		t.Fatalf("actions = %v, want both approval requirements preserved for composition", got)
 	}
 }
 
-func TestDecisionOwnsItsSlices(t *testing.T) {
+func TestDenyDecisionOwnsItsSlices(t *testing.T) {
 	t.Parallel()
 
-	reasons := []ReasonCode{ReasonExistingDelegationSufficient}
-	reviews := []CreateSafetyReviewAction{mustSafetyReviewAction(t)}
-	decision, err := NewAllowDecision(reasons, reviews)
+	reasons := []ReasonCode{ReasonDelegatorApprovalRequired}
+	actions := []PolicyAction{mustApprovalAction(t)}
+	decision, err := NewDenyDecision(reasons, actions)
 	if err != nil {
 		t.Fatalf("new decision: %v", err)
 	}
 
 	reasons[0] = ReasonPolicyUnavailable
-	reviews[0] = CreateSafetyReviewAction{}
-	if got := decision.ReasonCodes()[0]; got != ReasonExistingDelegationSufficient {
+	actions[0] = nil
+	if got := decision.ReasonCodes()[0]; got != ReasonDelegatorApprovalRequired {
 		t.Fatalf("stored reason = %q", got)
 	}
-	if got := decision.Actions()[0].Type(); got != PolicyActionCreateSafetyReview {
+	if got := decision.Actions()[0].Type(); got != PolicyActionRequireApproval {
 		t.Fatalf("stored action type = %q", got)
 	}
 
 	returnedReasons := decision.ReasonCodes()
 	returnedReasons[0] = ReasonPolicyUnavailable
-	if got := decision.ReasonCodes()[0]; got != ReasonExistingDelegationSufficient {
+	if got := decision.ReasonCodes()[0]; got != ReasonDelegatorApprovalRequired {
 		t.Fatalf("reason mutated through getter: %q", got)
 	}
 }
@@ -188,20 +190,6 @@ func mustApprovalActionWithID(t *testing.T, actionID, approvalID, principalID st
 	action, err := NewRequireApprovalAction(actionID, requirement)
 	if err != nil {
 		t.Fatalf("new approval action: %v", err)
-	}
-	return action
-}
-
-func mustSafetyReviewAction(t *testing.T) CreateSafetyReviewAction {
-	t.Helper()
-
-	requirement, err := NewSafetyReviewRequirement("review_123", SafetyReviewHigh, []string{"evidence_123"})
-	if err != nil {
-		t.Fatalf("new safety review requirement: %v", err)
-	}
-	action, err := NewCreateSafetyReviewAction("action_review_123", requirement)
-	if err != nil {
-		t.Fatalf("new safety review action: %v", err)
 	}
 	return action
 }

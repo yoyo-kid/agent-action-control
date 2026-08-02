@@ -54,8 +54,6 @@ paths:
                   $ref: '#/components/examples/TerminalDeny'
                 approvalRequired:
                   $ref: '#/components/examples/ApprovalRequired'
-                safetyReview:
-                  $ref: '#/components/examples/SafetyReview'
                 failClosed:
                   $ref: '#/components/examples/FailClosed'
         '400':
@@ -422,7 +420,6 @@ components:
           enum: [ALLOW, DENY]
         reasonCodes:
           type: array
-          minItems: 1
           uniqueItems: true
           items:
             $ref: '#/components/schemas/ReasonCode'
@@ -430,7 +427,7 @@ components:
           type: array
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/DecisionAction'
+            $ref: '#/components/schemas/RequireApprovalAction'
         policy:
           $ref: '#/components/schemas/PolicyMetadata'
         evaluatedAt:
@@ -443,11 +440,12 @@ components:
           properties:
             decision:
               const: ALLOW
+            reasonCodes:
+              type: array
+              maxItems: 0
             actions:
               type: array
-              uniqueItems: true
-              items:
-                $ref: '#/components/schemas/CreateSafetyReviewAction'
+              maxItems: 0
     DenyDecisionResponse:
       allOf:
         - $ref: '#/components/schemas/DecisionResponseBase'
@@ -455,20 +453,17 @@ components:
           properties:
             decision:
               const: DENY
+            reasonCodes:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/ReasonCode'
             actions:
               type: array
               uniqueItems: true
               items:
-                $ref: '#/components/schemas/DecisionAction'
-    DecisionAction:
-      oneOf:
-        - $ref: '#/components/schemas/RequireApprovalAction'
-        - $ref: '#/components/schemas/CreateSafetyReviewAction'
-      discriminator:
-        propertyName: type
-        mapping:
-          REQUIRE_APPROVAL: '#/components/schemas/RequireApprovalAction'
-          CREATE_SAFETY_REVIEW: '#/components/schemas/CreateSafetyReviewAction'
+                $ref: '#/components/schemas/RequireApprovalAction'
     RequireApprovalAction:
       type: object
       additionalProperties: false
@@ -504,33 +499,6 @@ components:
           const: DELEGATOR
         principalId:
           $ref: '#/components/schemas/Identifier'
-    CreateSafetyReviewAction:
-      type: object
-      additionalProperties: false
-      required: [actionId, type, context]
-      properties:
-        actionId:
-          $ref: '#/components/schemas/Identifier'
-        type:
-          const: CREATE_SAFETY_REVIEW
-        context:
-          $ref: '#/components/schemas/CreateSafetyReviewContext'
-    CreateSafetyReviewContext:
-      type: object
-      additionalProperties: false
-      required: [reviewRequestId, priority]
-      properties:
-        reviewRequestId:
-          $ref: '#/components/schemas/Identifier'
-        priority:
-          type: string
-          enum: [LOW, MEDIUM, HIGH, CRITICAL]
-        evidenceRefs:
-          type: array
-          uniqueItems: true
-          maxItems: 100
-          items:
-            $ref: '#/components/schemas/Identifier'
     PolicyMetadata:
       type: object
       additionalProperties: false
@@ -543,18 +511,15 @@ components:
     ReasonCode:
       type: string
       enum:
-        - EXISTING_DELEGATION_SUFFICIENT
         - DELEGATOR_APPROVAL_REQUIRED
         - EXTERNAL_DESTINATION
         - VISIBILITY_EXPANSION
         - DESTRUCTIVE_OPERATION
         - ACTOR_NOT_AUTHORIZED
-        - DELEGATOR_APPROVAL_VERIFIED
         - APPROVAL_REJECTED
         - APPROVAL_EXPIRED
         - ACTION_DIGEST_MISMATCH
         - ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
-        - SAFETY_REVIEW_REQUESTED
         - POLICY_UNAVAILABLE
     ErrorResponse:
       type: object
@@ -684,7 +649,7 @@ components:
         proposedActionId: pa_100
         actionDigest: sha256:allow100
         decision: ALLOW
-        reasonCodes: [EXISTING_DELEGATION_SUFFICIENT]
+        reasonCodes: []
         actions: []
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:30:00Z'
@@ -717,23 +682,6 @@ components:
               expiresAt: '2026-08-01T20:00:00Z'
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:32:00Z'
-    SafetyReview:
-      value:
-        apiVersion: v1
-        decisionId: dec_103
-        proposedActionId: pa_103
-        actionDigest: sha256:review103
-        decision: ALLOW
-        reasonCodes: [EXISTING_DELEGATION_SUFFICIENT, SAFETY_REVIEW_REQUESTED]
-        actions:
-          - actionId: act_103
-            type: CREATE_SAFETY_REVIEW
-            context:
-              reviewRequestId: review_103
-              priority: HIGH
-              evidenceRefs: [message_103]
-        policy: {version: policy-2026-08-01.1}
-        evaluatedAt: '2026-08-01T19:33:00Z'
     FailClosed:
       value:
         apiVersion: v1

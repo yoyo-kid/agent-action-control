@@ -106,8 +106,15 @@ func TestSafetyReviewRequirementOwnsEvidenceReferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new safety review requirement: %v", err)
 	}
+	effect, err := NewCreateSafetyReviewEffect(requirement)
+	if err != nil {
+		t.Fatalf("new safety review effect: %v", err)
+	}
+	if effect.Type() != PolicyEffectCreateSafetyReview {
+		t.Fatalf("effect type = %q", effect.Type())
+	}
 	references[0] = "mutated"
-	if got := requirement.EvidenceRefs()[0]; got != "message_123" {
+	if got := effect.Requirement().EvidenceRefs()[0]; got != "message_123" {
 		t.Fatalf("stored reference = %q", got)
 	}
 	returned := requirement.EvidenceRefs()

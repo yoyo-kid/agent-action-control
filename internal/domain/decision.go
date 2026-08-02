@@ -29,14 +29,10 @@ type Decision struct {
 	actions     []PolicyAction
 }
 
-// NewAllowDecision constructs an executable decision. Its typed action input
-// makes REQUIRE_APPROVAL structurally unrepresentable on an ALLOW decision.
-func NewAllowDecision(reasonCodes []ReasonCode, safetyReviews []CreateSafetyReviewAction) (Decision, error) {
-	actions := make([]PolicyAction, len(safetyReviews))
-	for index, review := range safetyReviews {
-		actions[index] = review
-	}
-	return newDecision(DecisionAllow, reasonCodes, actions)
+// NewAllowDecision constructs an executable M1 decision. Normal allows do not
+// expose policy reasons or internal background effects to upstream callers.
+func NewAllowDecision() Decision {
+	return Decision{typ: DecisionAllow}
 }
 
 // NewDenyDecision constructs a non-executable decision with the follow-up
@@ -44,12 +40,8 @@ func NewAllowDecision(reasonCodes []ReasonCode, safetyReviews []CreateSafetyRevi
 // preserved so DecisionComposer can aggregate them without losing authority or
 // review context.
 func NewDenyDecision(reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
-	return newDecision(DecisionDeny, reasonCodes, actions)
-}
-
-func newDecision(typ DecisionType, reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
 	if len(reasonCodes) == 0 {
-		return Decision{}, fmt.Errorf("%w: at least one reason code is required", ErrInvalidArgument)
+		return Decision{}, fmt.Errorf("%w: deny decision requires at least one reason code", ErrInvalidArgument)
 	}
 
 	normalizedReasons := make([]ReasonCode, 0, len(reasonCodes))
@@ -79,7 +71,7 @@ func newDecision(typ DecisionType, reasonCodes []ReasonCode, actions []PolicyAct
 	}
 
 	return Decision{
-		typ:         typ,
+		typ:         DecisionDeny,
 		reasonCodes: normalizedReasons,
 		actions:     append([]PolicyAction(nil), actions...),
 	}, nil
