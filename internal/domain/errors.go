@@ -10,8 +10,4 @@ var (
 	ErrInvalidPrincipalType    = errors.New("invalid principal type")
 	ErrInvalidDigest           = errors.New("invalid action digest")
 	ErrInvalidArgument         = errors.New("invalid argument")
-
-	ErrAllowCannotRequireApproval = errors.New("allow decision cannot require approval")
-	ErrDuplicatePolicyAction      = errors.New("duplicate policy action type")
-	ErrDuplicateReasonCode        = errors.New("duplicate reason code")
 )

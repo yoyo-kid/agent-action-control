@@ -29,26 +29,42 @@ type Decision struct {
 	actions     []PolicyAction
 }
 
-func NewDecision(typ DecisionType, reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
-	if !typ.Valid() {
-		return Decision{}, fmt.Errorf("%w: %q", ErrInvalidDecisionType, typ)
+// NewAllowDecision constructs an executable decision. Its typed action input
+// makes REQUIRE_APPROVAL structurally unrepresentable on an ALLOW decision.
+func NewAllowDecision(reasonCodes []ReasonCode, safetyReviews []CreateSafetyReviewAction) (Decision, error) {
+	actions := make([]PolicyAction, len(safetyReviews))
+	for index, review := range safetyReviews {
+		actions[index] = review
 	}
+	return newDecision(DecisionAllow, reasonCodes, actions)
+}
+
+// NewDenyDecision constructs a non-executable decision with the follow-up
+// requirements produced by policy. Distinct requirements of the same type are
+// preserved so DecisionComposer can aggregate them without losing authority or
+// review context.
+func NewDenyDecision(reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
+	return newDecision(DecisionDeny, reasonCodes, actions)
+}
+
+func newDecision(typ DecisionType, reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
 	if len(reasonCodes) == 0 {
 		return Decision{}, fmt.Errorf("%w: at least one reason code is required", ErrInvalidArgument)
 	}
 
+	normalizedReasons := make([]ReasonCode, 0, len(reasonCodes))
 	seenReasons := make(map[ReasonCode]struct{}, len(reasonCodes))
 	for _, code := range reasonCodes {
 		if !code.Valid() {
 			return Decision{}, fmt.Errorf("%w: %q", ErrInvalidReasonCode, code)
 		}
 		if _, exists := seenReasons[code]; exists {
-			return Decision{}, fmt.Errorf("%w: %q", ErrDuplicateReasonCode, code)
+			continue
 		}
 		seenReasons[code] = struct{}{}
+		normalizedReasons = append(normalizedReasons, code)
 	}
 
-	seenActions := make(map[PolicyActionType]struct{}, len(actions))
 	for _, action := range actions {
 		if action == nil {
 			return Decision{}, fmt.Errorf("%w: policy action cannot be nil", ErrInvalidArgument)
@@ -60,18 +76,11 @@ func NewDecision(typ DecisionType, reasonCodes []ReasonCode, actions []PolicyAct
 		if !actionType.Valid() {
 			return Decision{}, fmt.Errorf("%w: %q", ErrInvalidPolicyActionType, actionType)
 		}
-		if _, exists := seenActions[actionType]; exists {
-			return Decision{}, fmt.Errorf("%w: %q", ErrDuplicatePolicyAction, actionType)
-		}
-		seenActions[actionType] = struct{}{}
-		if typ == DecisionAllow && actionType == PolicyActionRequireApproval {
-			return Decision{}, ErrAllowCannotRequireApproval
-		}
 	}
 
 	return Decision{
 		typ:         typ,
-		reasonCodes: append([]ReasonCode(nil), reasonCodes...),
+		reasonCodes: normalizedReasons,
 		actions:     append([]PolicyAction(nil), actions...),
 	}, nil
 }

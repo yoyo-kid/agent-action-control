@@ -37,64 +37,88 @@ func TestDecisionCompositionInvariants(t *testing.T) {
 	approval := mustApprovalAction(t)
 	review := mustSafetyReviewAction(t)
 
-	tests := []struct {
-		name    string
-		typ     DecisionType
-		actions []PolicyAction
-		wantErr error
-	}{
-		{name: "direct allow", typ: DecisionAllow},
-		{name: "terminal deny", typ: DecisionDeny},
-		{name: "deny requiring approval", typ: DecisionDeny, actions: []PolicyAction{approval}},
-		{name: "allow creating safety review", typ: DecisionAllow, actions: []PolicyAction{review}},
-		{name: "deny creating safety review", typ: DecisionDeny, actions: []PolicyAction{review}},
-		{name: "deny with both actions", typ: DecisionDeny, actions: []PolicyAction{approval, review}},
-		{name: "allow requiring approval", typ: DecisionAllow, actions: []PolicyAction{approval}, wantErr: ErrAllowCannotRequireApproval},
+	allow, err := NewAllowDecision(
+		[]ReasonCode{ReasonExistingDelegationSufficient},
+		[]CreateSafetyReviewAction{review},
+	)
+	if err != nil {
+		t.Fatalf("new allow decision: %v", err)
+	}
+	if allow.Type() != DecisionAllow || allow.Actions()[0].Type() != PolicyActionCreateSafetyReview {
+		t.Fatalf("unexpected allow decision: type=%q actions=%v", allow.Type(), allow.Actions())
 	}
 
-	for _, test := range tests {
+	denyCases := []struct {
+		name    string
+		actions []PolicyAction
+	}{
+		{name: "terminal deny"},
+		{name: "deny requiring approval", actions: []PolicyAction{approval}},
+		{name: "deny creating safety review", actions: []PolicyAction{review}},
+		{name: "deny with both actions", actions: []PolicyAction{approval, review}},
+	}
+	for _, test := range denyCases {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			decision, err := NewDecision(test.typ, []ReasonCode{ReasonExistingDelegationSufficient}, test.actions)
-			if !errors.Is(err, test.wantErr) {
-				t.Fatalf("error = %v, want %v", err, test.wantErr)
+			decision, err := NewDenyDecision([]ReasonCode{ReasonDelegatorApprovalRequired}, test.actions)
+			if err != nil {
+				t.Fatalf("new deny decision: %v", err)
 			}
-			if test.wantErr == nil && decision.Type() != test.typ {
-				t.Fatalf("decision type = %q, want %q", decision.Type(), test.typ)
+			if decision.Type() != DecisionDeny {
+				t.Fatalf("decision type = %q, want %q", decision.Type(), DecisionDeny)
 			}
 		})
 	}
 }
 
-func TestDecisionRejectsInvalidAndDuplicateMembers(t *testing.T) {
+func TestDecisionRejectsInvalidMembers(t *testing.T) {
 	t.Parallel()
 
-	approval := mustApprovalAction(t)
 	tests := []struct {
 		name    string
-		typ     DecisionType
 		reasons []ReasonCode
 		actions []PolicyAction
 		wantErr error
 	}{
-		{name: "unknown decision", typ: DecisionType("UNKNOWN"), reasons: []ReasonCode{ReasonPolicyUnavailable}, wantErr: ErrInvalidDecisionType},
-		{name: "no reasons", typ: DecisionDeny, wantErr: ErrInvalidArgument},
-		{name: "unknown reason", typ: DecisionDeny, reasons: []ReasonCode{"UNKNOWN"}, wantErr: ErrInvalidReasonCode},
-		{name: "duplicate reasons", typ: DecisionDeny, reasons: []ReasonCode{ReasonPolicyUnavailable, ReasonPolicyUnavailable}, wantErr: ErrDuplicateReasonCode},
-		{name: "duplicate actions", typ: DecisionDeny, reasons: []ReasonCode{ReasonDelegatorApprovalRequired}, actions: []PolicyAction{approval, approval}, wantErr: ErrDuplicatePolicyAction},
-		{name: "nil action", typ: DecisionDeny, reasons: []ReasonCode{ReasonPolicyUnavailable}, actions: []PolicyAction{nil}, wantErr: ErrInvalidArgument},
+		{name: "no reasons", wantErr: ErrInvalidArgument},
+		{name: "unknown reason", reasons: []ReasonCode{"UNKNOWN"}, wantErr: ErrInvalidReasonCode},
+		{name: "nil action", reasons: []ReasonCode{ReasonPolicyUnavailable}, actions: []PolicyAction{nil}, wantErr: ErrInvalidArgument},
 	}
 
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := NewDecision(test.typ, test.reasons, test.actions)
+			_, err := NewDenyDecision(test.reasons, test.actions)
 			if !errors.Is(err, test.wantErr) {
 				t.Fatalf("error = %v, want %v", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestDecisionNormalizesRepeatedInputs(t *testing.T) {
+	t.Parallel()
+
+	firstApproval := mustApprovalAction(t)
+	secondApproval := mustApprovalActionWithID(t, "action_approval_456", "approval_456", "user_456")
+	decision, err := NewDenyDecision(
+		[]ReasonCode{
+			ReasonDelegatorApprovalRequired,
+			ReasonExternalDestination,
+			ReasonDelegatorApprovalRequired,
+		},
+		[]PolicyAction{firstApproval, secondApproval},
+	)
+	if err != nil {
+		t.Fatalf("new deny decision: %v", err)
+	}
+	if got := decision.ReasonCodes(); len(got) != 2 || got[0] != ReasonDelegatorApprovalRequired || got[1] != ReasonExternalDestination {
+		t.Fatalf("normalized reasons = %v", got)
+	}
+	if got := decision.Actions(); len(got) != 2 {
+		t.Fatalf("actions = %v, want both distinct approval requirements preserved for composition", got)
 	}
 }
 
@@ -102,14 +126,14 @@ func TestDecisionOwnsItsSlices(t *testing.T) {
 	t.Parallel()
 
 	reasons := []ReasonCode{ReasonExistingDelegationSufficient}
-	actions := []PolicyAction{mustSafetyReviewAction(t)}
-	decision, err := NewDecision(DecisionAllow, reasons, actions)
+	reviews := []CreateSafetyReviewAction{mustSafetyReviewAction(t)}
+	decision, err := NewAllowDecision(reasons, reviews)
 	if err != nil {
 		t.Fatalf("new decision: %v", err)
 	}
 
 	reasons[0] = ReasonPolicyUnavailable
-	actions[0] = nil
+	reviews[0] = CreateSafetyReviewAction{}
 	if got := decision.ReasonCodes()[0]; got != ReasonExistingDelegationSufficient {
 		t.Fatalf("stored reason = %q", got)
 	}
@@ -143,8 +167,13 @@ func TestParseActionDigest(t *testing.T) {
 
 func mustApprovalAction(t *testing.T) RequireApprovalAction {
 	t.Helper()
+	return mustApprovalActionWithID(t, "action_approval_123", "approval_123", "user_123")
+}
 
-	authority, err := NewDelegatorAuthority("user_123")
+func mustApprovalActionWithID(t *testing.T, actionID, approvalID, principalID string) RequireApprovalAction {
+	t.Helper()
+
+	authority, err := NewDelegatorAuthority(principalID)
 	if err != nil {
 		t.Fatalf("new authority: %v", err)
 	}
@@ -152,11 +181,11 @@ func mustApprovalAction(t *testing.T) RequireApprovalAction {
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
 	}
-	requirement, err := NewApprovalRequirement("approval_123", authority, digest, time.Now().Add(time.Hour))
+	requirement, err := NewApprovalRequirement(approvalID, authority, digest, time.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("new approval requirement: %v", err)
 	}
-	action, err := NewRequireApprovalAction("action_approval_123", requirement)
+	action, err := NewRequireApprovalAction(actionID, requirement)
 	if err != nil {
 		t.Fatalf("new approval action: %v", err)
 	}
