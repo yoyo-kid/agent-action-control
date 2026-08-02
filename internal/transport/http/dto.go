@@ -29,8 +29,7 @@ const (
 type FollowUpActionType string
 
 const (
-	ActionRequireApproval    FollowUpActionType = "REQUIRE_APPROVAL"
-	ActionCreateSafetyReview FollowUpActionType = "CREATE_SAFETY_REVIEW"
+	ActionRequireApproval FollowUpActionType = "REQUIRE_APPROVAL"
 )
 
 type ErrorCode string
@@ -149,12 +148,6 @@ type RequiredAuthority struct {
 	PrincipalID string `json:"principalId"`
 }
 
-type CreateSafetyReviewContext struct {
-	ReviewRequestID string   `json:"reviewRequestId"`
-	Priority        string   `json:"priority"`
-	EvidenceRefs    []string `json:"evidenceRefs,omitempty"`
-}
-
 type PolicyMetadata struct {
 	Version string `json:"version"`
 }
@@ -215,19 +208,24 @@ func (response DecisionResponse) Validate() error {
 	if response.Decision != DecisionAllow && response.Decision != DecisionDeny {
 		return fmt.Errorf("unsupported decision %q", response.Decision)
 	}
+	if response.Decision == DecisionAllow {
+		if len(response.ReasonCodes) != 0 {
+			return errors.New("ALLOW cannot include reason codes in v1")
+		}
+		if len(response.Actions) != 0 {
+			return errors.New("ALLOW cannot include follow-up actions in v1")
+		}
+		return nil
+	}
+	if len(response.ReasonCodes) == 0 {
+		return errors.New("DENY requires at least one reason code")
+	}
 
 	for index, action := range response.Actions {
 		switch action.Type {
 		case ActionRequireApproval:
-			if response.Decision == DecisionAllow {
-				return errors.New("ALLOW cannot include REQUIRE_APPROVAL")
-			}
 			if err := decodeStrict(bytes.NewReader(action.Context), &RequireApprovalContext{}); err != nil {
 				return fmt.Errorf("decode action %d REQUIRE_APPROVAL context: %w", index, err)
-			}
-		case ActionCreateSafetyReview:
-			if err := decodeStrict(bytes.NewReader(action.Context), &CreateSafetyReviewContext{}); err != nil {
-				return fmt.Errorf("decode action %d CREATE_SAFETY_REVIEW context: %w", index, err)
 			}
 		default:
 			return fmt.Errorf("unsupported follow-up action type %q", action.Type)
