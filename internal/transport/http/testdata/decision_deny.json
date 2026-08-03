@@ -2,7 +2,7 @@
   "apiVersion": "v1",
   "decisionId": "dec_101",
   "proposedActionId": "pa_101",
-  "actionDigest": "sha256:deny101",
+  "actionDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "decision": "DENY",
   "reasonCodes": ["ACTOR_NOT_AUTHORIZED"],
   "actions": [],

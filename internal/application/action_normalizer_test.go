@@ -206,7 +206,7 @@ func validInput(parameters ActionParametersInput) ProposedActionInput {
 		},
 		Parameters: parameters,
 		Payload: PayloadInput{
-			Digest: " sha256:payload123 ",
+			Digest: " sha256:1111111111111111111111111111111111111111111111111111111111111111 ",
 		},
 	}
 }

@@ -16,14 +16,22 @@ The first milestone implements the synchronous decision endpoint and its minimal
 
 Early development. The repository currently contains the service foundation,
 health endpoint, v1 HTTP contract, core decision model, and deterministic action
-normalizer. Decision orchestration and the public decision handler are not yet
-implemented.
+normalizer. It also computes a versioned canonical SHA-256 digest over each
+normalized action. Decision orchestration and the public decision handler are
+not yet implemented.
 
 The normalizer treats authenticated runtime identity as trusted context and the
 body `runtimeId` as an assertion: an omitted value is supplied from authentication,
 while a conflicting value is rejected. It canonicalizes set-like security facts
 such as recipients, target principals, classification labels, and authorization
 evidence without retaining raw payload content or display-only metadata.
+
+Both payload and action digests use the canonical representation
+`sha256:<64 lowercase hexadecimal characters>`. The authenticated runtime
+supplies the payload digest; Action Control computes the action digest over the
+normalized actor, delegation, target, action parameters, payload facts, and
+authorization evidence. Runtime-side verification of the exact outgoing bytes
+at the execution boundary is a later integration responsibility.
 
 ## Requirements
 

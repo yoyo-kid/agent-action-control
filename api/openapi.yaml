@@ -575,9 +575,10 @@ components:
       maxLength: 256
     Digest:
       type: string
-      pattern: '^sha256:[A-Za-z0-9_-]+$'
-      minLength: 8
-      maxLength: 128
+      description: Canonical SHA-256 encoded as 64 lowercase hexadecimal characters.
+      pattern: '^sha256:[a-f0-9]{64}$'
+      minLength: 71
+      maxLength: 71
   examples:
     ExternalSendRequest:
       summary: Send classified content to an external recipient.
@@ -600,7 +601,7 @@ components:
             destinationScope: EXTERNAL
             recipients: [customer@example.com]
           payload:
-            digest: sha256:abc123
+            digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
             classification: [CONFIDENTIAL]
             sizeBytes: 4280
           authorizationEvidence:
@@ -625,7 +626,7 @@ components:
             delegator: {type: USER, id: user_456}
           target: {resourceType: DOCUMENT, resourceId: doc_124}
           parameters: {currentScope: PRIVATE, requestedScope: PUBLIC}
-          payload: {digest: sha256:share124}
+          payload: {digest: sha256:2222222222222222222222222222222222222222222222222222222222222222}
     DeleteRequest:
       summary: Permanently delete a resource.
       value:
@@ -641,13 +642,13 @@ components:
             delegator: {type: USER, id: user_456}
           target: {resourceType: DOCUMENT, resourceId: doc_125}
           parameters: {deleteMode: HARD, recoverable: false}
-          payload: {digest: sha256:delete125}
+          payload: {digest: sha256:3333333333333333333333333333333333333333333333333333333333333333}
     DirectAllow:
       value:
         apiVersion: v1
         decisionId: dec_100
         proposedActionId: pa_100
-        actionDigest: sha256:allow100
+        actionDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         decision: ALLOW
         reasonCodes: []
         actions: []
@@ -658,7 +659,7 @@ components:
         apiVersion: v1
         decisionId: dec_101
         proposedActionId: pa_101
-        actionDigest: sha256:deny101
+        actionDigest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         decision: DENY
         reasonCodes: [ACTOR_NOT_AUTHORIZED]
         actions: []
@@ -669,7 +670,7 @@ components:
         apiVersion: v1
         decisionId: dec_102
         proposedActionId: pa_102
-        actionDigest: sha256:approval102
+        actionDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         decision: DENY
         reasonCodes: [DELEGATOR_APPROVAL_REQUIRED]
         actions:
@@ -678,7 +679,7 @@ components:
             context:
               approvalRequestId: apr_102
               requiredAuthority: {type: DELEGATOR, principalId: user_456}
-              actionDigest: sha256:approval102
+              actionDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
               expiresAt: '2026-08-01T20:00:00Z'
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:32:00Z'
@@ -687,7 +688,7 @@ components:
         apiVersion: v1
         decisionId: dec_104
         proposedActionId: pa_104
-        actionDigest: sha256:closed104
+        actionDigest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
         decision: DENY
         reasonCodes: [POLICY_UNAVAILABLE]
         actions: []

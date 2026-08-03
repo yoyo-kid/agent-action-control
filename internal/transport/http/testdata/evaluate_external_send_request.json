@@ -26,7 +26,7 @@
       "recipients": ["customer@example.com"]
     },
     "payload": {
-      "digest": "sha256:abc123",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "classification": ["CONFIDENTIAL"],
       "sizeBytes": 4280
     },

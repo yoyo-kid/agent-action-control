@@ -42,7 +42,7 @@ func TestNewProposedAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new target: %v", err)
 	}
-	digest, err := ParsePayloadDigest("sha256:payload123")
+	digest, err := ParsePayloadDigest("sha256:1111111111111111111111111111111111111111111111111111111111111111")
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestNewProposedAction(t *testing.T) {
 func TestNewProposedActionRejectsMismatchedParameters(t *testing.T) {
 	t.Parallel()
 
-	digest, err := ParsePayloadDigest("sha256:payload123")
+	digest, err := ParsePayloadDigest("sha256:1111111111111111111111111111111111111111111111111111111111111111")
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
 	}

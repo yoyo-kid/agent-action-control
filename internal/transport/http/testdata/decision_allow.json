@@ -2,7 +2,7 @@
   "apiVersion": "v1",
   "decisionId": "dec_100",
   "proposedActionId": "pa_100",
-  "actionDigest": "sha256:allow100",
+  "actionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "decision": "ALLOW",
   "reasonCodes": [],
   "actions": [],

@@ -153,7 +153,15 @@ func TestDenyDecisionOwnsItsSlices(t *testing.T) {
 func TestParseActionDigest(t *testing.T) {
 	t.Parallel()
 
-	for _, value := range []string{"", "md5:abc", "sha256:", "sha256:not valid"} {
+	for _, value := range []string{
+		"",
+		"md5:abc",
+		"sha256:",
+		"sha256:not valid",
+		"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+	} {
 		value := value
 		t.Run(value, func(t *testing.T) {
 			t.Parallel()
@@ -162,7 +170,7 @@ func TestParseActionDigest(t *testing.T) {
 			}
 		})
 	}
-	if digest, err := ParseActionDigest("sha256:abc_123-Z"); err != nil || digest.String() != "sha256:abc_123-Z" {
+	if digest, err := ParseActionDigest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"); err != nil || digest.String() != "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" {
 		t.Fatalf("valid digest = %q, %v", digest, err)
 	}
 }
@@ -179,7 +187,7 @@ func mustApprovalActionWithID(t *testing.T, actionID, approvalID, principalID st
 	if err != nil {
 		t.Fatalf("new authority: %v", err)
 	}
-	digest, err := ParseActionDigest("sha256:action123")
+	digest, err := ParseActionDigest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 	if err != nil {
 		t.Fatalf("parse digest: %v", err)
 	}

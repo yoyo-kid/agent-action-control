@@ -80,7 +80,7 @@ func TestUpdateResourceAccessParametersRejectInvalidTransitions(t *testing.T) {
 func TestPayloadFactsAreNormalizedAndImmutable(t *testing.T) {
 	t.Parallel()
 
-	digest, _ := ParsePayloadDigest("sha256:payload123")
+	digest, _ := ParsePayloadDigest("sha256:1111111111111111111111111111111111111111111111111111111111111111")
 	size := int64(42)
 	payload, err := NewPayloadFacts(digest, []string{" SECRET ", "CONFIDENTIAL", "SECRET"}, &size)
 	if err != nil {
