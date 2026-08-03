@@ -2,7 +2,7 @@
   "apiVersion": "v1",
   "decisionId": "dec_104",
   "proposedActionId": "pa_104",
-  "actionDigest": "sha256:closed104",
+  "actionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "decision": "DENY",
   "reasonCodes": ["POLICY_UNAVAILABLE"],
   "actions": [],

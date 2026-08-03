@@ -69,14 +69,16 @@ func (digest PayloadDigest) Valid() bool {
 func (digest PayloadDigest) String() string { return string(digest) }
 
 func validateSHA256Digest(value string) error {
-	if len(value) < 8 || len(value) > 128 || !strings.HasPrefix(value, "sha256:") {
-		return fmt.Errorf("%w: expected sha256 digest", ErrInvalidDigest)
+	const (
+		prefix      = "sha256:"
+		hexSize     = 64
+		encodedSize = len(prefix) + hexSize
+	)
+	if len(value) != encodedSize || !strings.HasPrefix(value, prefix) {
+		return fmt.Errorf("%w: expected sha256 followed by 64 lowercase hexadecimal characters", ErrInvalidDigest)
 	}
-	for _, character := range value[len("sha256:"):] {
-		if (character < 'a' || character > 'z') &&
-			(character < 'A' || character > 'Z') &&
-			(character < '0' || character > '9') &&
-			character != '_' && character != '-' {
+	for _, character := range value[len(prefix):] {
+		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
 			return fmt.Errorf("%w: unsupported digest character %q", ErrInvalidDigest, character)
 		}
 	}
@@ -182,10 +184,9 @@ func NewProposedAction(
 	if !payload.valid() {
 		return ProposedAction{}, ErrInvalidDigest
 	}
-	for _, item := range evidence {
-		if !item.valid() {
-			return ProposedAction{}, fmt.Errorf("%w: invalid authorization evidence", ErrInvalidArgument)
-		}
+	normalizedEvidence, err := NormalizeAuthorizationEvidence(evidence)
+	if err != nil {
+		return ProposedAction{}, err
 	}
 	return ProposedAction{
 		id:          id,
@@ -196,7 +197,7 @@ func NewProposedAction(
 		target:      target,
 		parameters:  parameters.clone(),
 		payload:     payload.clone(),
-		evidence:    cloneAuthorizationEvidence(evidence),
+		evidence:    normalizedEvidence,
 	}, nil
 }
 

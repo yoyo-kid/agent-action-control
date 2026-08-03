@@ -158,7 +158,7 @@ func TestDecisionResponseRejectsAllowWithApproval(t *testing.T) {
 			Context: json.RawMessage(`{
 				"approvalRequestId":"apr_123",
 				"requiredAuthority":{"type":"DELEGATOR","principalId":"user_456"},
-				"actionDigest":"sha256:def456",
+				"actionDigest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 				"expiresAt":"2026-08-01T20:00:00Z"
 			}`),
 		}},
