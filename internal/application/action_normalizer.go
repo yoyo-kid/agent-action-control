@@ -11,11 +11,6 @@ import (
 
 var ErrRuntimeIdentityConflict = errors.New("runtime identity conflicts with authenticated caller")
 
-// AuthenticatedRuntime is trusted context supplied by the authentication adapter.
-type AuthenticatedRuntime struct {
-	RuntimeID string
-}
-
 // ProposedActionInput is transport-independent, caller-supplied action data.
 // RuntimeID is an assertion and is never trusted over AuthenticatedRuntime.
 type ProposedActionInput struct {
@@ -108,9 +103,20 @@ func (ActionNormalizer) Normalize(
 	caller AuthenticatedRuntime,
 	input ProposedActionInput,
 ) (domain.ProposedAction, error) {
-	runtimeID := strings.TrimSpace(caller.RuntimeID)
+	action, err := normalizeAction(caller, input)
+	if err != nil && !errors.Is(err, ErrInvalidInput) {
+		return domain.ProposedAction{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
+	}
+	return action, err
+}
+
+func normalizeAction(
+	caller AuthenticatedRuntime,
+	input ProposedActionInput,
+) (domain.ProposedAction, error) {
+	runtimeID := caller.RuntimeID()
 	if runtimeID == "" {
-		return domain.ProposedAction{}, fmt.Errorf("%w: authenticated runtime id is required", domain.ErrInvalidArgument)
+		return domain.ProposedAction{}, fmt.Errorf("%w: authenticated runtime id is required", ErrInvalidInput)
 	}
 	claimedRuntimeID := strings.TrimSpace(input.Actor.RuntimeID)
 	if claimedRuntimeID != "" && claimedRuntimeID != runtimeID {
