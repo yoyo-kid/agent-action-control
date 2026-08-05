@@ -136,7 +136,10 @@ func (fakePolicyEvaluator) Evaluate(context.Context, domain.ProposedAction) (Pol
 
 type fakeDecisionLedger struct{}
 
-func (fakeDecisionLedger) FindAction(context.Context, string) (*StoredEvaluation, error) {
+func (fakeDecisionLedger) GetEvaluationByProposedActionID(
+	context.Context,
+	string,
+) (*StoredEvaluation, error) {
 	return nil, ErrActionNotFound
 }
 

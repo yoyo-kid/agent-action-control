@@ -16,6 +16,9 @@ type PolicyEvaluator interface {
 // Implementations must return ErrActionNotFound for a missing action and wrap
 // uncertain persistence failures with ErrLedgerFailure.
 type DecisionLedger interface {
-	FindAction(context.Context, string) (*StoredEvaluation, error)
+	GetEvaluationByProposedActionID(
+		ctx context.Context,
+		proposedActionID string,
+	) (*StoredEvaluation, error)
 	CommitEvaluation(context.Context, EvaluationCommit) (DecisionRecord, error)
 }
