@@ -33,7 +33,7 @@ func TestActionNormalizerNormalizesExternalSend(t *testing.T) {
 	}
 
 	action, err := (ActionNormalizer{}).Normalize(
-		AuthenticatedRuntime{RuntimeID: " runtime_456 "},
+		mustAuthenticatedRuntime(t, " runtime_456 "),
 		input,
 	)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestActionNormalizerRejectsRuntimeIdentityConflict(t *testing.T) {
 	input.Actor.RuntimeID = "runtime_attacker"
 
 	_, err := (ActionNormalizer{}).Normalize(
-		AuthenticatedRuntime{RuntimeID: "runtime_456"},
+		mustAuthenticatedRuntime(t, "runtime_456"),
 		input,
 	)
 	if !errors.Is(err, ErrRuntimeIdentityConflict) {
@@ -87,7 +87,7 @@ func TestActionNormalizerSuppliesAuthenticatedRuntimeWhenBodyOmitsIt(t *testing.
 	input.Actor.RuntimeID = ""
 
 	action, err := (ActionNormalizer{}).Normalize(
-		AuthenticatedRuntime{RuntimeID: "runtime_456"},
+		mustAuthenticatedRuntime(t, "runtime_456"),
 		input,
 	)
 	if err != nil {
@@ -130,7 +130,7 @@ func TestActionNormalizerSupportsAllActionVariants(t *testing.T) {
 			input := validInput(test.parameters)
 			input.Type = test.typ
 			action, err := (ActionNormalizer{}).Normalize(
-				AuthenticatedRuntime{RuntimeID: "runtime_456"},
+				mustAuthenticatedRuntime(t, "runtime_456"),
 				input,
 			)
 			if err != nil {
@@ -172,15 +172,24 @@ func TestActionNormalizerRejectsInvalidActionFacts(t *testing.T) {
 				Recipients:       []string{"customer@example.com"},
 			})
 			test.mutate(&input)
-			caller := AuthenticatedRuntime{RuntimeID: "runtime_456"}
+			caller := mustAuthenticatedRuntime(t, "runtime_456")
 			if test.name == "missing authenticated runtime" {
-				caller.RuntimeID = ""
+				caller = AuthenticatedRuntime{}
 			}
-			if _, err := (ActionNormalizer{}).Normalize(caller, input); err == nil {
-				t.Fatal("expected normalization error")
+			if _, err := (ActionNormalizer{}).Normalize(caller, input); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("error = %v, want %v", err, ErrInvalidInput)
 			}
 		})
 	}
+}
+
+func mustAuthenticatedRuntime(t *testing.T, runtimeID string) AuthenticatedRuntime {
+	t.Helper()
+	runtime, err := NewAuthenticatedRuntime(runtimeID)
+	if err != nil {
+		t.Fatalf("new authenticated runtime: %v", err)
+	}
+	return runtime
 }
 
 func validInput(parameters ActionParametersInput) ProposedActionInput {
