@@ -7,13 +7,13 @@ import (
 )
 
 // PolicyEvaluation is the policy-engine-independent result consumed by the
-// DecisionComposer. Effects are internal and never become public actions.
+// DecisionComposer. Actions are upstream instructions; effects stay internal.
 type PolicyEvaluation struct {
-	DenyReasonCodes      []domain.ReasonCode
-	ApprovalRequirements []domain.ApprovalRequirement
-	Effects              []domain.PolicyEffect
-	MatchedRuleIDs       []string
-	PolicyVersion        string
+	DenyReasonCodes []domain.ReasonCode
+	Actions         []domain.PolicyAction
+	Effects         []domain.PolicyEffect
+	MatchedRuleIDs  []string
+	PolicyVersion   string
 }
 
 // DecisionRecord is the authoritative decision metadata returned by a
