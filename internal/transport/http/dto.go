@@ -26,21 +26,21 @@ const (
 	DecisionDeny  DecisionType = "DENY"
 )
 
-type FollowUpActionType string
+type RequiredActionType string
 
 const (
-	ActionRequireApproval FollowUpActionType = "REQUIRE_APPROVAL"
+	RequiredActionRequireApproval RequiredActionType = "REQUIRE_APPROVAL"
 )
 
 type ErrorCode string
 
 const (
-	ErrorMalformedRequest ErrorCode = "MALFORMED_REQUEST"
-	ErrorAuthentication   ErrorCode = "AUTHENTICATION_REQUIRED"
-	ErrorRuntimeForbidden ErrorCode = "RUNTIME_NOT_AUTHORIZED"
-	ErrorActionIDConflict ErrorCode = "ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT"
-	ErrorValidation       ErrorCode = "VALIDATION_FAILED"
-	ErrorInternal         ErrorCode = "INTERNAL_ERROR"
+	ErrorMalformedRequest  ErrorCode = "MALFORMED_REQUEST"
+	ErrorAuthentication    ErrorCode = "AUTHENTICATION_REQUIRED"
+	ErrorRuntimeForbidden  ErrorCode = "RUNTIME_NOT_AUTHORIZED"
+	ErrorRequestIDConflict ErrorCode = "REQUEST_ID_REUSED_WITH_DIFFERENT_ACTION"
+	ErrorValidation        ErrorCode = "VALIDATION_FAILED"
+	ErrorInternal          ErrorCode = "INTERNAL_ERROR"
 )
 
 type EvaluateActionRequest struct {
@@ -50,7 +50,6 @@ type EvaluateActionRequest struct {
 }
 
 type ProposedAction struct {
-	ID                    string                  `json:"id"`
 	Type                  ProposedActionType      `json:"type"`
 	RequestedAt           time.Time               `json:"requestedAt"`
 	Actor                 Actor                   `json:"actor"`
@@ -119,33 +118,19 @@ type DeleteParameters struct {
 }
 
 type DecisionResponse struct {
-	APIVersion       string           `json:"apiVersion"`
-	DecisionID       string           `json:"decisionId"`
-	ProposedActionID string           `json:"proposedActionId"`
-	ActionDigest     string           `json:"actionDigest"`
-	Decision         DecisionType     `json:"decision"`
-	ReasonCodes      []string         `json:"reasonCodes"`
-	Actions          []DecisionAction `json:"actions"`
-	Policy           PolicyMetadata   `json:"policy"`
-	EvaluatedAt      time.Time        `json:"evaluatedAt"`
+	APIVersion      string           `json:"apiVersion"`
+	RequestID       string           `json:"requestId"`
+	DecisionID      string           `json:"decisionId"`
+	ActionDigest    string           `json:"actionDigest"`
+	Decision        DecisionType     `json:"decision"`
+	ReasonCodes     []string         `json:"reasonCodes"`
+	RequiredActions []RequiredAction `json:"requiredActions"`
+	Policy          PolicyMetadata   `json:"policy"`
+	EvaluatedAt     time.Time        `json:"evaluatedAt"`
 }
 
-type DecisionAction struct {
-	ActionID string             `json:"actionId"`
-	Type     FollowUpActionType `json:"type"`
-	Context  json.RawMessage    `json:"context"`
-}
-
-type RequireApprovalContext struct {
-	ApprovalRequestID string            `json:"approvalRequestId"`
-	RequiredAuthority RequiredAuthority `json:"requiredAuthority"`
-	ActionDigest      string            `json:"actionDigest"`
-	ExpiresAt         time.Time         `json:"expiresAt"`
-}
-
-type RequiredAuthority struct {
-	Type        string `json:"type"`
-	PrincipalID string `json:"principalId"`
+type RequiredAction struct {
+	Type RequiredActionType `json:"type"`
 }
 
 type PolicyMetadata struct {
@@ -212,8 +197,8 @@ func (response DecisionResponse) Validate() error {
 		if len(response.ReasonCodes) != 0 {
 			return errors.New("ALLOW cannot include reason codes in v1")
 		}
-		if len(response.Actions) != 0 {
-			return errors.New("ALLOW cannot include follow-up actions in v1")
+		if len(response.RequiredActions) != 0 {
+			return errors.New("ALLOW cannot include required actions in v1")
 		}
 		return nil
 	}
@@ -221,15 +206,22 @@ func (response DecisionResponse) Validate() error {
 		return errors.New("DENY requires at least one reason code")
 	}
 
-	for index, action := range response.Actions {
-		switch action.Type {
-		case ActionRequireApproval:
-			if err := decodeStrict(bytes.NewReader(action.Context), &RequireApprovalContext{}); err != nil {
-				return fmt.Errorf("decode action %d REQUIRE_APPROVAL context: %w", index, err)
-			}
-		default:
-			return fmt.Errorf("unsupported follow-up action type %q", action.Type)
+	hasApprovalReason := false
+	for _, reason := range response.ReasonCodes {
+		if reason == "DELEGATOR_APPROVAL_REQUIRED" {
+			hasApprovalReason = true
 		}
+	}
+
+	for _, action := range response.RequiredActions {
+		switch action.Type {
+		case RequiredActionRequireApproval:
+		default:
+			return fmt.Errorf("unsupported required action type %q", action.Type)
+		}
+	}
+	if hasApprovalReason != (len(response.RequiredActions) == 1) {
+		return errors.New("DELEGATOR_APPROVAL_REQUIRED and REQUIRE_APPROVAL must appear together in v1")
 	}
 	return nil
 }

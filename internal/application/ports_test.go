@@ -51,10 +51,8 @@ func TestClockAndIDGeneratorAreDeterministicSeams(t *testing.T) {
 	}
 
 	ids := sequenceIDGenerator{values: map[IDKind]string{
-		IDDecision:        "dec_123",
-		IDPolicyAction:    "act_123",
-		IDApprovalRequest: "apr_123",
-		IDPolicyEffect:    "effect_123",
+		IDDecision:     "dec_123",
+		IDPolicyEffect: "effect_123",
 	}}
 	for kind, want := range ids.values {
 		got, err := ids.NewID(kind)
@@ -72,8 +70,6 @@ func TestIDKindIsClosed(t *testing.T) {
 
 	for _, value := range []string{
 		string(IDDecision),
-		string(IDPolicyAction),
-		string(IDApprovalRequest),
 		string(IDPolicyEffect),
 	} {
 		if _, err := ParseIDKind(value); err != nil {
@@ -90,10 +86,10 @@ func TestApplicationErrorTaxonomyIsDistinct(t *testing.T) {
 
 	errorsToCheck := []error{
 		ErrInvalidInput,
-		ErrActionIDConflict,
+		ErrRequestIDConflict,
 		ErrPolicyUnavailable,
 		ErrLedgerFailure,
-		ErrActionNotFound,
+		ErrEvaluationNotFound,
 		ErrIDGeneration,
 		domain.ErrInvariantViolation,
 	}
@@ -136,11 +132,12 @@ func (fakePolicyEvaluator) Evaluate(context.Context, domain.ProposedAction) (Pol
 
 type fakeDecisionLedger struct{}
 
-func (fakeDecisionLedger) GetEvaluationByProposedActionID(
+func (fakeDecisionLedger) GetEvaluationByRequestID(
 	context.Context,
 	string,
+	string,
 ) (*StoredEvaluation, error) {
-	return nil, ErrActionNotFound
+	return nil, ErrEvaluationNotFound
 }
 
 func (fakeDecisionLedger) CommitEvaluation(

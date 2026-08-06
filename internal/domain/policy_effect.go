@@ -50,19 +50,14 @@ func (priority SafetyReviewPriority) Valid() bool {
 }
 
 type SafetyReviewRequirement struct {
-	reviewRequestID string
-	priority        SafetyReviewPriority
-	evidenceRefs    []string
+	priority     SafetyReviewPriority
+	evidenceRefs []string
 }
 
 func NewSafetyReviewRequirement(
-	reviewRequestID string,
 	priority SafetyReviewPriority,
 	evidenceRefs []string,
 ) (SafetyReviewRequirement, error) {
-	if strings.TrimSpace(reviewRequestID) == "" {
-		return SafetyReviewRequirement{}, fmt.Errorf("%w: review request id is required", ErrInvalidArgument)
-	}
 	if !priority.Valid() {
 		return SafetyReviewRequirement{}, fmt.Errorf("%w: invalid safety review priority %q", ErrInvalidArgument, priority)
 	}
@@ -77,15 +72,11 @@ func NewSafetyReviewRequirement(
 		seenEvidence[ref] = struct{}{}
 	}
 	return SafetyReviewRequirement{
-		reviewRequestID: reviewRequestID,
-		priority:        priority,
-		evidenceRefs:    append([]string(nil), evidenceRefs...),
+		priority:     priority,
+		evidenceRefs: append([]string(nil), evidenceRefs...),
 	}, nil
 }
 
-func (requirement SafetyReviewRequirement) ReviewRequestID() string {
-	return requirement.reviewRequestID
-}
 func (requirement SafetyReviewRequirement) Priority() SafetyReviewPriority {
 	return requirement.priority
 }
@@ -113,7 +104,7 @@ func (effect CreateSafetyReviewEffect) Requirement() SafetyReviewRequirement {
 }
 func (CreateSafetyReviewEffect) isPolicyEffect() {}
 func (effect CreateSafetyReviewEffect) validate() error {
-	if strings.TrimSpace(effect.requirement.reviewRequestID) == "" || !effect.requirement.priority.Valid() {
+	if !effect.requirement.priority.Valid() {
 		return fmt.Errorf("%w: invalid safety review requirement", ErrInvalidArgument)
 	}
 	return nil

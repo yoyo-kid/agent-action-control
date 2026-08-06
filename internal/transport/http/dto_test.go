@@ -67,10 +67,10 @@ func TestDecisionResponseGoldenRoundTrip(t *testing.T) {
 	}
 }
 
-func TestErrorResponseGoldenRoundTrip(t *testing.T) {
+func TestRequestIDConflictResponseGoldenRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	want := readGolden(t, "error_action_id_conflict.json")
+	want := readGolden(t, "error_request_id_conflict.json")
 	var response httptransport.ErrorResponse
 	if err := json.Unmarshal(want, &response); err != nil {
 		t.Fatalf("decode error response: %v", err)
@@ -117,16 +117,15 @@ func TestDecisionResponseRejectsUnknownValues(t *testing.T) {
 		name     string
 		decision httptransport.DecisionType
 		reasons  []string
-		actions  []httptransport.DecisionAction
+		actions  []httptransport.RequiredAction
 	}{
 		{name: "decision", decision: "REVIEW"},
 		{
 			name:     "internal safety-review effect is not a public action",
 			decision: httptransport.DecisionDeny,
 			reasons:  []string{"POLICY_UNAVAILABLE"},
-			actions: []httptransport.DecisionAction{{
-				Type:    "CREATE_SAFETY_REVIEW",
-				Context: json.RawMessage(`{}`),
+			actions: []httptransport.RequiredAction{{
+				Type: "CREATE_SAFETY_REVIEW",
 			}},
 		},
 	}
@@ -135,10 +134,10 @@ func TestDecisionResponseRejectsUnknownValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			response := httptransport.DecisionResponse{
-				APIVersion:  httptransport.APIVersionV1,
-				Decision:    test.decision,
-				ReasonCodes: test.reasons,
-				Actions:     test.actions,
+				APIVersion:      httptransport.APIVersionV1,
+				Decision:        test.decision,
+				ReasonCodes:     test.reasons,
+				RequiredActions: test.actions,
 			}
 			if err := response.Validate(); err == nil {
 				t.Fatal("expected validation error")
@@ -153,18 +152,37 @@ func TestDecisionResponseRejectsAllowWithApproval(t *testing.T) {
 	response := httptransport.DecisionResponse{
 		APIVersion: httptransport.APIVersionV1,
 		Decision:   httptransport.DecisionAllow,
-		Actions: []httptransport.DecisionAction{{
-			Type: httptransport.ActionRequireApproval,
-			Context: json.RawMessage(`{
-				"approvalRequestId":"apr_123",
-				"requiredAuthority":{"type":"DELEGATOR","principalId":"user_456"},
-				"actionDigest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-				"expiresAt":"2026-08-01T20:00:00Z"
-			}`),
+		RequiredActions: []httptransport.RequiredAction{{
+			Type: httptransport.RequiredActionRequireApproval,
 		}},
 	}
 	if err := response.Validate(); err == nil {
 		t.Fatal("expected ALLOW + REQUIRE_APPROVAL to be rejected")
+	}
+}
+
+func TestDecisionResponseRequiresApprovalReasonAndActionTogether(t *testing.T) {
+	t.Parallel()
+
+	tests := []httptransport.DecisionResponse{
+		{
+			APIVersion:  httptransport.APIVersionV1,
+			Decision:    httptransport.DecisionDeny,
+			ReasonCodes: []string{"DELEGATOR_APPROVAL_REQUIRED"},
+		},
+		{
+			APIVersion:  httptransport.APIVersionV1,
+			Decision:    httptransport.DecisionDeny,
+			ReasonCodes: []string{"ACTOR_NOT_AUTHORIZED"},
+			RequiredActions: []httptransport.RequiredAction{{
+				Type: httptransport.RequiredActionRequireApproval,
+			}},
+		},
+	}
+	for _, response := range tests {
+		if err := response.Validate(); err == nil {
+			t.Fatal("expected approval reason/action mismatch to be rejected")
+		}
 	}
 }
 

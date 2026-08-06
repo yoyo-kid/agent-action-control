@@ -121,20 +121,7 @@ func TestActionDigestIgnoresSetOrderingAndDuplicates(t *testing.T) {
 	}
 }
 
-func TestActionDigestExcludesProposedActionID(t *testing.T) {
-	t.Parallel()
-
-	base := mustComputeActionDigest(t, externalActionFixture(t, nil))
-	changedID := externalActionFixture(t, func(value *externalDigestFixture) {
-		value.actionID = "proposed_456"
-	})
-	if got := mustComputeActionDigest(t, changedID); got != base {
-		t.Fatalf("digest = %q, want %q", got, base)
-	}
-}
-
 type externalDigestFixture struct {
-	actionID         string
 	requestedAt      time.Time
 	agentID          string
 	runtimeID        string
@@ -153,7 +140,6 @@ type externalDigestFixture struct {
 func externalActionFixture(t *testing.T, mutate func(*externalDigestFixture)) ProposedAction {
 	t.Helper()
 	fixture := externalDigestFixture{
-		actionID:         "proposed_123",
 		requestedAt:      time.Date(2026, time.August, 3, 12, 34, 56, 123456789, time.UTC),
 		agentID:          "agent_123",
 		runtimeID:        "runtime_123",
@@ -194,7 +180,6 @@ func externalActionFixture(t *testing.T, mutate func(*externalDigestFixture)) Pr
 		evidence = []AuthorizationEvidence{grantEvidence, messageEvidence, grantEvidence}
 	}
 	action, err := NewProposedAction(
-		fixture.actionID,
 		ActionExternalSend,
 		fixture.requestedAt,
 		actor,
@@ -237,7 +222,6 @@ func actionWithParameters(t *testing.T, actionType ActionType, parameters Action
 	payloadDigest, _ := ParsePayloadDigest("sha256:1111111111111111111111111111111111111111111111111111111111111111")
 	payload, _ := NewPayloadFacts(payloadDigest, nil, nil)
 	action, err := NewProposedAction(
-		"proposed_123",
 		actionType,
 		time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC),
 		actor,

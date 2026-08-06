@@ -5,10 +5,12 @@ Agent Action Control is an open-source runtime control point for consequential A
 The MVP contract intentionally stays small:
 
 - Decisions are `ALLOW` or `DENY`.
-- The only public follow-up action is `REQUIRE_APPROVAL`.
+- The only public required action is `REQUIRE_APPROVAL`.
 - `CREATE_SAFETY_REVIEW` is an internal asynchronous policy effect owned by the service.
 - Only `ALLOW` permits upstream execution.
-- Normal `ALLOW` responses contain empty `reasonCodes` and `actions` arrays.
+- Normal `ALLOW` responses contain empty `reasonCodes` and `requiredActions` arrays.
+- `requestId` is the authenticated-runtime-scoped idempotency key and remains stable across exact retries.
+- M1 exposes only the minimal required action `{"type":"REQUIRE_APPROVAL"}`; approval workflow identity and TTL begin in M2.
 
 The first milestone implements the synchronous decision endpoint and its minimal SQLite ledger. Delegator approval callbacks and execution outcome reporting follow in later milestones.
 

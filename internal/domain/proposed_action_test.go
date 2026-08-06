@@ -53,7 +53,6 @@ func TestNewProposedAction(t *testing.T) {
 	}
 
 	action, err := NewProposedAction(
-		"proposed_123",
 		ActionExternalSend,
 		time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC),
 		actor,
@@ -93,7 +92,6 @@ func TestNewProposedActionRejectsMismatchedParameters(t *testing.T) {
 		t.Fatalf("new payload: %v", err)
 	}
 	_, err = NewProposedAction(
-		"proposed_123",
 		ActionDelete,
 		time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC),
 		Actor{agentID: "agent_123", runtimeID: "runtime_123"},
@@ -112,7 +110,7 @@ func TestSafetyReviewRequirementOwnsEvidenceReferences(t *testing.T) {
 	t.Parallel()
 
 	references := []string{"message_123"}
-	requirement, err := NewSafetyReviewRequirement("review_123", SafetyReviewHigh, references)
+	requirement, err := NewSafetyReviewRequirement(SafetyReviewHigh, references)
 	if err != nil {
 		t.Fatalf("new safety review requirement: %v", err)
 	}

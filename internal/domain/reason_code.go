@@ -6,16 +6,12 @@ import "fmt"
 type ReasonCode string
 
 const (
-	ReasonDelegatorApprovalRequired          ReasonCode = "DELEGATOR_APPROVAL_REQUIRED"
-	ReasonExternalDestination                ReasonCode = "EXTERNAL_DESTINATION"
-	ReasonVisibilityExpansion                ReasonCode = "VISIBILITY_EXPANSION"
-	ReasonDestructiveOperation               ReasonCode = "DESTRUCTIVE_OPERATION"
-	ReasonActorNotAuthorized                 ReasonCode = "ACTOR_NOT_AUTHORIZED"
-	ReasonApprovalRejected                   ReasonCode = "APPROVAL_REJECTED"
-	ReasonApprovalExpired                    ReasonCode = "APPROVAL_EXPIRED"
-	ReasonActionDigestMismatch               ReasonCode = "ACTION_DIGEST_MISMATCH"
-	ReasonActionIDReusedWithDifferentContent ReasonCode = "ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT"
-	ReasonPolicyUnavailable                  ReasonCode = "POLICY_UNAVAILABLE"
+	ReasonDelegatorApprovalRequired ReasonCode = "DELEGATOR_APPROVAL_REQUIRED"
+	ReasonExternalDestination       ReasonCode = "EXTERNAL_DESTINATION"
+	ReasonVisibilityExpansion       ReasonCode = "VISIBILITY_EXPANSION"
+	ReasonDestructiveOperation      ReasonCode = "DESTRUCTIVE_OPERATION"
+	ReasonActorNotAuthorized        ReasonCode = "ACTOR_NOT_AUTHORIZED"
+	ReasonPolicyUnavailable         ReasonCode = "POLICY_UNAVAILABLE"
 )
 
 func ParseReasonCode(value string) (ReasonCode, error) {
@@ -33,10 +29,6 @@ func (code ReasonCode) Valid() bool {
 		ReasonVisibilityExpansion,
 		ReasonDestructiveOperation,
 		ReasonActorNotAuthorized,
-		ReasonApprovalRejected,
-		ReasonApprovalExpired,
-		ReasonActionDigestMismatch,
-		ReasonActionIDReusedWithDifferentContent,
 		ReasonPolicyUnavailable:
 		return true
 	default:

@@ -24,9 +24,9 @@ func (typ DecisionType) Valid() bool {
 
 // Decision is an immutable policy result plus typed upstream instructions.
 type Decision struct {
-	typ         DecisionType
-	reasonCodes []ReasonCode
-	actions     []PolicyAction
+	typ             DecisionType
+	reasonCodes     []ReasonCode
+	requiredActions []RequiredAction
 }
 
 // NewAllowDecision constructs an executable M1 decision. Normal allows do not
@@ -35,11 +35,9 @@ func NewAllowDecision() Decision {
 	return Decision{typ: DecisionAllow}
 }
 
-// NewDenyDecision constructs a non-executable decision with the follow-up
-// requirements produced by policy. Distinct requirements of the same type are
-// preserved so DecisionComposer can aggregate them without losing authority or
-// review context.
-func NewDenyDecision(reasonCodes []ReasonCode, actions []PolicyAction) (Decision, error) {
+// NewDenyDecision constructs a non-executable decision. Repeated reasons and
+// required-action types are normalized in first-seen order.
+func NewDenyDecision(reasonCodes []ReasonCode, requiredActions []RequiredAction) (Decision, error) {
 	if len(reasonCodes) == 0 {
 		return Decision{}, fmt.Errorf("%w: deny decision requires at least one reason code", ErrInvalidArgument)
 	}
@@ -57,23 +55,37 @@ func NewDenyDecision(reasonCodes []ReasonCode, actions []PolicyAction) (Decision
 		normalizedReasons = append(normalizedReasons, code)
 	}
 
-	for _, action := range actions {
-		if action == nil {
-			return Decision{}, fmt.Errorf("%w: policy action cannot be nil", ErrInvalidArgument)
+	normalizedActions := make([]RequiredAction, 0, len(requiredActions))
+	seenActions := make(map[RequiredActionType]struct{}, len(requiredActions))
+	for _, action := range requiredActions {
+		if !action.valid() {
+			return Decision{}, fmt.Errorf("%w: %q", ErrInvalidRequiredActionType, action.Type())
 		}
-		if err := action.validate(); err != nil {
-			return Decision{}, err
+		if _, exists := seenActions[action.Type()]; exists {
+			continue
 		}
-		actionType := action.Type()
-		if !actionType.Valid() {
-			return Decision{}, fmt.Errorf("%w: %q", ErrInvalidPolicyActionType, actionType)
+		seenActions[action.Type()] = struct{}{}
+		normalizedActions = append(normalizedActions, action)
+	}
+
+	hasApprovalReason := false
+	for _, code := range normalizedReasons {
+		if code == ReasonDelegatorApprovalRequired {
+			hasApprovalReason = true
+			break
 		}
+	}
+	if len(normalizedActions) > 0 && !hasApprovalReason {
+		return Decision{}, fmt.Errorf("%w: required approval needs delegator approval reason", ErrInvariantViolation)
+	}
+	if hasApprovalReason && len(normalizedActions) == 0 {
+		return Decision{}, fmt.Errorf("%w: delegator approval reason needs required approval", ErrInvariantViolation)
 	}
 
 	return Decision{
-		typ:         DecisionDeny,
-		reasonCodes: normalizedReasons,
-		actions:     append([]PolicyAction(nil), actions...),
+		typ:             DecisionDeny,
+		reasonCodes:     normalizedReasons,
+		requiredActions: normalizedActions,
 	}, nil
 }
 
@@ -81,6 +93,6 @@ func (decision Decision) Type() DecisionType { return decision.typ }
 func (decision Decision) ReasonCodes() []ReasonCode {
 	return append([]ReasonCode(nil), decision.reasonCodes...)
 }
-func (decision Decision) Actions() []PolicyAction {
-	return append([]PolicyAction(nil), decision.actions...)
+func (decision Decision) RequiredActions() []RequiredAction {
+	return append([]RequiredAction(nil), decision.requiredActions...)
 }

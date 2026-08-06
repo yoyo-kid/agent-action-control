@@ -14,7 +14,6 @@ var ErrRuntimeIdentityConflict = errors.New("runtime identity conflicts with aut
 // ProposedActionInput is transport-independent, caller-supplied action data.
 // RuntimeID is an assertion and is never trusted over AuthenticatedRuntime.
 type ProposedActionInput struct {
-	ID                    string
 	Type                  domain.ActionType
 	RequestedAt           time.Time
 	Actor                 ActorInput
@@ -162,7 +161,6 @@ func normalizeAction(
 	}
 
 	action, err := domain.NewProposedAction(
-		input.ID,
 		input.Type,
 		input.RequestedAt,
 		actor,

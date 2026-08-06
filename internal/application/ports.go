@@ -13,12 +13,13 @@ type PolicyEvaluator interface {
 }
 
 // DecisionLedger owns idempotency reads and atomic evaluation persistence.
-// Implementations must return ErrActionNotFound for a missing action and wrap
+// Implementations must return ErrEvaluationNotFound for a missing request and wrap
 // uncertain persistence failures with ErrLedgerFailure.
 type DecisionLedger interface {
-	GetEvaluationByProposedActionID(
+	GetEvaluationByRequestID(
 		ctx context.Context,
-		proposedActionID string,
+		runtimeID string,
+		requestID string,
 	) (*StoredEvaluation, error)
 	CommitEvaluation(context.Context, EvaluationCommit) (DecisionRecord, error)
 }
