@@ -10,7 +10,7 @@ POST /v1/action-decisions
 
 Policy-level `ALLOW` and `DENY` results both use HTTP `200`. HTTP errors describe malformed input, authentication and caller authorization failures, idempotency conflicts, schema validation failures, or unexpected service failures. Callers must fail closed on every non-`200` response.
 
-Normal `ALLOW` responses carry empty `reasonCodes` and `actions` arrays. A `DENY` response carries at least one reason code and may include `REQUIRE_APPROVAL`, the only public follow-up action in v1. Safety-review creation is an internal asynchronous service effect and is not exposed to upstream callers.
+Normal `ALLOW` responses carry empty `reasonCodes` and `requiredActions` arrays. A `DENY` response carries at least one reason code and may include the minimal `{"type":"REQUIRE_APPROVAL"}` instruction, the only public required action in M1. Safety-review creation is an internal asynchronous service effect and is not exposed to upstream callers.
 
 The OpenAPI document is loaded and semantically validated by the Go test suite.
 
@@ -24,6 +24,7 @@ over its versioned canonical representation of all normalized security facts.
 
 The canonical action representation does not hash the caller's original JSON.
 JSON whitespace and key order are removed by decoding, and set-like values are
-sorted and deduplicated during normalization. Request IDs, proposed-action IDs,
-and display-only metadata are excluded from the semantic action digest and are
-bound separately by the ledger and decision records.
+sorted and deduplicated during normalization. Request identity, decision output,
+and display-only metadata are excluded from the semantic action digest. The
+ledger separately binds authenticated runtime ID plus stable request ID to the
+computed digest and authoritative decision.

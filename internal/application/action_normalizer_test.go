@@ -194,7 +194,6 @@ func mustAuthenticatedRuntime(t *testing.T, runtimeID string) AuthenticatedRunti
 
 func validInput(parameters ActionParametersInput) ProposedActionInput {
 	return ProposedActionInput{
-		ID:          " proposed_123 ",
 		Type:        parameters.actionType(),
 		RequestedAt: time.Date(2026, time.August, 2, 12, 0, 0, 0, time.FixedZone("test", -7*60*60)),
 		Actor: ActorInput{

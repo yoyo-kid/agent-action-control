@@ -1,23 +1,13 @@
 {
   "apiVersion": "v1",
+  "requestId": "req_102",
   "decisionId": "dec_102",
-  "proposedActionId": "pa_102",
   "actionDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "decision": "DENY",
   "reasonCodes": ["DELEGATOR_APPROVAL_REQUIRED"],
-  "actions": [
+  "requiredActions": [
     {
-      "actionId": "act_102",
-      "type": "REQUIRE_APPROVAL",
-      "context": {
-        "approvalRequestId": "apr_102",
-        "requiredAuthority": {
-          "type": "DELEGATOR",
-          "principalId": "user_456"
-        },
-        "actionDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "expiresAt": "2026-08-01T20:00:00Z"
-      }
+      "type": "REQUIRE_APPROVAL"
     }
   ],
   "policy": {"version": "policy-2026-08-01.1"},

@@ -7,15 +7,13 @@ import "fmt"
 type IDKind string
 
 const (
-	IDDecision        IDKind = "DECISION"
-	IDPolicyAction    IDKind = "POLICY_ACTION"
-	IDApprovalRequest IDKind = "APPROVAL_REQUEST"
-	IDPolicyEffect    IDKind = "POLICY_EFFECT"
+	IDDecision     IDKind = "DECISION"
+	IDPolicyEffect IDKind = "POLICY_EFFECT"
 )
 
 func (kind IDKind) Valid() bool {
 	switch kind {
-	case IDDecision, IDPolicyAction, IDApprovalRequest, IDPolicyEffect:
+	case IDDecision, IDPolicyEffect:
 		return true
 	default:
 		return false

@@ -7,10 +7,9 @@ import (
 )
 
 // PolicyEvaluation is the policy-engine-independent result consumed by the
-// DecisionComposer. Actions are upstream instructions; effects stay internal.
+// DecisionComposer. Reasons drive public decisions; effects stay internal.
 type PolicyEvaluation struct {
 	DenyReasonCodes []domain.ReasonCode
-	Actions         []domain.PolicyAction
 	Effects         []domain.PolicyEffect
 	MatchedRuleIDs  []string
 	PolicyVersion   string
@@ -27,15 +26,18 @@ type DecisionRecord struct {
 	EvaluatedAt    time.Time
 }
 
-// StoredEvaluation is the idempotency view returned for an existing action.
+// StoredEvaluation is the idempotency view for one runtime-scoped request.
 type StoredEvaluation struct {
-	Action   domain.ProposedAction
-	Decision DecisionRecord
+	RuntimeID string
+	RequestID string
+	Action    domain.ProposedAction
+	Decision  DecisionRecord
 }
 
 // EvaluationCommit contains everything the ledger must persist atomically for
-// one evaluated action, including internal effects.
+// one evaluated request, including internal effects.
 type EvaluationCommit struct {
+	RuntimeID      string
 	RequestID      string
 	Action         domain.ProposedAction
 	ActionDigest   domain.ActionDigest

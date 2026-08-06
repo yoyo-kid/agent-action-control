@@ -59,6 +59,13 @@ func (parameters ExternalSendParameters) clone() ActionParameters {
 // AccessScope is a canonical, policy-readable resource visibility token.
 type AccessScope string
 
+const (
+	AccessPrivate   AccessScope = "PRIVATE"
+	AccessShared    AccessScope = "SHARED"
+	AccessWorkspace AccessScope = "WORKSPACE"
+	AccessPublic    AccessScope = "PUBLIC"
+)
+
 func ParseAccessScope(value string) (AccessScope, error) {
 	value = strings.ToUpper(strings.TrimSpace(value))
 	if value == "" || len(value) > 128 {
@@ -94,7 +101,7 @@ func NewUpdateResourceAccessParameters(
 	if err != nil {
 		return UpdateResourceAccessParameters{}, err
 	}
-	if normalizedRequested == AccessScope("SHARED") && len(principals) == 0 {
+	if normalizedRequested == AccessShared && len(principals) == 0 {
 		return UpdateResourceAccessParameters{}, fmt.Errorf("%w: SHARED scope requires target principals", ErrInvalidArgument)
 	}
 	return UpdateResourceAccessParameters{

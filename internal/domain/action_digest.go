@@ -11,11 +11,11 @@ const canonicalActionSchemaV1 = "agent-action-control/action-digest/v1"
 
 // CanonicalActionBytes serializes every security-relevant normalized action
 // fact into the versioned byte representation used by ComputeActionDigest.
-// Proposed-action ID is deliberately excluded: it is the ledger idempotency
-// key, while this digest identifies the action's security semantics.
+// Request identity is deliberately absent from ProposedAction: it is an
+// application idempotency concern, while this digest identifies action
+// security semantics.
 func CanonicalActionBytes(action ProposedAction) ([]byte, error) {
 	normalized, err := NewProposedAction(
-		action.id,
 		action.typ,
 		action.requestedAt,
 		action.actor,

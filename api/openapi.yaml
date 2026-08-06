@@ -63,7 +63,7 @@ paths:
         '403':
           $ref: '#/components/responses/RuntimeNotAuthorized'
         '409':
-          $ref: '#/components/responses/ActionIDConflict'
+          $ref: '#/components/responses/RequestIDConflict'
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '500':
@@ -114,8 +114,8 @@ components:
             error:
               code: RUNTIME_NOT_AUTHORIZED
               message: The caller is not authorized for this runtime.
-    ActionIDConflict:
-      description: The proposed action ID is already bound to a different digest.
+    RequestIDConflict:
+      description: The runtime-scoped request ID is already bound to a different action digest.
       content:
         application/json:
           schema:
@@ -124,10 +124,10 @@ components:
             apiVersion: v1
             requestId: req_123
             error:
-              code: ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
-              message: The proposed action ID is already bound to different content.
+              code: REQUEST_ID_REUSED_WITH_DIFFERENT_ACTION
+              message: The request ID is already bound to a different action.
               details:
-                - field: proposedAction.id
+                - field: requestId
                   code: IDEMPOTENCY_CONFLICT
     ValidationFailed:
       description: JSON was decoded but one or more contract constraints failed.
@@ -167,6 +167,9 @@ components:
           const: v1
         requestId:
           $ref: '#/components/schemas/Identifier'
+          description: >-
+            Idempotency key for one action request. An exact retry by the same
+            authenticated runtime must reuse this value.
         proposedAction:
           $ref: '#/components/schemas/ProposedAction'
     ProposedAction:
@@ -184,7 +187,6 @@ components:
       type: object
       additionalProperties: false
       required:
-        - id
         - type
         - requestedAt
         - actor
@@ -193,8 +195,6 @@ components:
         - parameters
         - payload
       properties:
-        id:
-          $ref: '#/components/schemas/Identifier'
         type:
           $ref: '#/components/schemas/ProposedActionType'
         requestedAt:
@@ -397,21 +397,22 @@ components:
       additionalProperties: false
       required:
         - apiVersion
+        - requestId
         - decisionId
-        - proposedActionId
         - actionDigest
         - decision
         - reasonCodes
-        - actions
+        - requiredActions
         - policy
         - evaluatedAt
       properties:
         apiVersion:
           type: string
           const: v1
-        decisionId:
+        requestId:
           $ref: '#/components/schemas/Identifier'
-        proposedActionId:
+          description: Echoes the idempotency key of the evaluated request.
+        decisionId:
           $ref: '#/components/schemas/Identifier'
         actionDigest:
           $ref: '#/components/schemas/Digest'
@@ -423,11 +424,11 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/ReasonCode'
-        actions:
+        requiredActions:
           type: array
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/RequireApprovalAction'
+            $ref: '#/components/schemas/RequiredAction'
         policy:
           $ref: '#/components/schemas/PolicyMetadata'
         evaluatedAt:
@@ -443,7 +444,7 @@ components:
             reasonCodes:
               type: array
               maxItems: 0
-            actions:
+            requiredActions:
               type: array
               maxItems: 0
     DenyDecisionResponse:
@@ -459,46 +460,22 @@ components:
               uniqueItems: true
               items:
                 $ref: '#/components/schemas/ReasonCode'
-            actions:
+            requiredActions:
               type: array
               uniqueItems: true
               items:
-                $ref: '#/components/schemas/RequireApprovalAction'
-    RequireApprovalAction:
+                $ref: '#/components/schemas/RequiredAction'
+    RequiredAction:
       type: object
+      description: >-
+        Blocking work the upstream runtime must complete. In v1,
+        REQUIRE_APPROVAL appears exactly once if and only if reasonCodes contains
+        DELEGATOR_APPROVAL_REQUIRED.
       additionalProperties: false
-      required: [actionId, type, context]
+      required: [type]
       properties:
-        actionId:
-          $ref: '#/components/schemas/Identifier'
         type:
           const: REQUIRE_APPROVAL
-        context:
-          $ref: '#/components/schemas/RequireApprovalContext'
-    RequireApprovalContext:
-      type: object
-      additionalProperties: false
-      required: [approvalRequestId, requiredAuthority, actionDigest, expiresAt]
-      properties:
-        approvalRequestId:
-          $ref: '#/components/schemas/Identifier'
-        requiredAuthority:
-          $ref: '#/components/schemas/RequiredAuthority'
-        actionDigest:
-          $ref: '#/components/schemas/Digest'
-        expiresAt:
-          type: string
-          format: date-time
-    RequiredAuthority:
-      type: object
-      additionalProperties: false
-      required: [type, principalId]
-      properties:
-        type:
-          type: string
-          const: DELEGATOR
-        principalId:
-          $ref: '#/components/schemas/Identifier'
     PolicyMetadata:
       type: object
       additionalProperties: false
@@ -516,10 +493,6 @@ components:
         - VISIBILITY_EXPANSION
         - DESTRUCTIVE_OPERATION
         - ACTOR_NOT_AUTHORIZED
-        - APPROVAL_REJECTED
-        - APPROVAL_EXPIRED
-        - ACTION_DIGEST_MISMATCH
-        - ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
         - POLICY_UNAVAILABLE
     ErrorResponse:
       type: object
@@ -544,7 +517,7 @@ components:
             - MALFORMED_REQUEST
             - AUTHENTICATION_REQUIRED
             - RUNTIME_NOT_AUTHORIZED
-            - ACTION_ID_REUSED_WITH_DIFFERENT_CONTENT
+            - REQUEST_ID_REUSED_WITH_DIFFERENT_ACTION
             - VALIDATION_FAILED
             - INTERNAL_ERROR
         message:
@@ -586,7 +559,6 @@ components:
         apiVersion: v1
         requestId: req_123
         proposedAction:
-          id: pa_123
           type: EXTERNAL_SEND
           requestedAt: '2026-08-01T19:30:00Z'
           actor:
@@ -617,7 +589,6 @@ components:
         apiVersion: v1
         requestId: req_124
         proposedAction:
-          id: pa_124
           type: UPDATE_RESOURCE_ACCESS
           requestedAt: '2026-08-01T19:31:00Z'
           actor: {agentId: agent_123, runtimeId: runtime_456}
@@ -633,7 +604,6 @@ components:
         apiVersion: v1
         requestId: req_125
         proposedAction:
-          id: pa_125
           type: DELETE
           requestedAt: '2026-08-01T19:32:00Z'
           actor: {agentId: agent_123, runtimeId: runtime_456}
@@ -646,51 +616,45 @@ components:
     DirectAllow:
       value:
         apiVersion: v1
+        requestId: req_100
         decisionId: dec_100
-        proposedActionId: pa_100
         actionDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         decision: ALLOW
         reasonCodes: []
-        actions: []
+        requiredActions: []
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:30:00Z'
     TerminalDeny:
       value:
         apiVersion: v1
+        requestId: req_101
         decisionId: dec_101
-        proposedActionId: pa_101
         actionDigest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         decision: DENY
         reasonCodes: [ACTOR_NOT_AUTHORIZED]
-        actions: []
+        requiredActions: []
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:31:00Z'
     ApprovalRequired:
       value:
         apiVersion: v1
+        requestId: req_102
         decisionId: dec_102
-        proposedActionId: pa_102
         actionDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         decision: DENY
         reasonCodes: [DELEGATOR_APPROVAL_REQUIRED]
-        actions:
-          - actionId: act_102
-            type: REQUIRE_APPROVAL
-            context:
-              approvalRequestId: apr_102
-              requiredAuthority: {type: DELEGATOR, principalId: user_456}
-              actionDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-              expiresAt: '2026-08-01T20:00:00Z'
+        requiredActions:
+          - type: REQUIRE_APPROVAL
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:32:00Z'
     FailClosed:
       value:
         apiVersion: v1
+        requestId: req_104
         decisionId: dec_104
-        proposedActionId: pa_104
         actionDigest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
         decision: DENY
         reasonCodes: [POLICY_UNAVAILABLE]
-        actions: []
+        requiredActions: []
         policy: {version: policy-2026-08-01.1}
         evaluatedAt: '2026-08-01T19:34:00Z'

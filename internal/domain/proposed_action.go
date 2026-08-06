@@ -131,7 +131,6 @@ type ActionParameters interface {
 
 // ProposedAction is an immutable description of an intended side effect.
 type ProposedAction struct {
-	id          string
 	typ         ActionType
 	requestedAt time.Time
 	actor       Actor
@@ -143,7 +142,6 @@ type ProposedAction struct {
 }
 
 func NewProposedAction(
-	id string,
 	typ ActionType,
 	requestedAt time.Time,
 	actor Actor,
@@ -153,10 +151,6 @@ func NewProposedAction(
 	payload PayloadFacts,
 	evidence []AuthorizationEvidence,
 ) (ProposedAction, error) {
-	id, err := normalizeRequiredIdentifier(id, "proposed action id")
-	if err != nil {
-		return ProposedAction{}, err
-	}
 	if !typ.Valid() {
 		return ProposedAction{}, fmt.Errorf("%w: %q", ErrInvalidActionType, typ)
 	}
@@ -189,7 +183,6 @@ func NewProposedAction(
 		return ProposedAction{}, err
 	}
 	return ProposedAction{
-		id:          id,
 		typ:         typ,
 		requestedAt: requestedAt.UTC(),
 		actor:       actor,
@@ -201,7 +194,6 @@ func NewProposedAction(
 	}, nil
 }
 
-func (action ProposedAction) ID() string             { return action.id }
 func (action ProposedAction) Type() ActionType       { return action.typ }
 func (action ProposedAction) RequestedAt() time.Time { return action.requestedAt }
 func (action ProposedAction) Actor() Actor           { return action.actor }
