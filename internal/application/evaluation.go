@@ -34,6 +34,13 @@ type StoredEvaluation struct {
 	Decision  DecisionRecord
 }
 
+// PolicyEffectCommit binds one application-generated internal record ID to a
+// policy effect. Persistence adapters store the ID but do not invent it.
+type PolicyEffectCommit struct {
+	EffectID string
+	Effect   domain.PolicyEffect
+}
+
 // EvaluationCommit contains everything the ledger must persist atomically for
 // one evaluated request, including internal effects.
 type EvaluationCommit struct {
@@ -45,6 +52,6 @@ type EvaluationCommit struct {
 	Decision       domain.Decision
 	PolicyVersion  string
 	MatchedRuleIDs []string
-	Effects        []domain.PolicyEffect
+	Effects        []PolicyEffectCommit
 	EvaluatedAt    time.Time
 }
