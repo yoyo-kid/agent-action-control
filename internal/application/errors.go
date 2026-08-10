@@ -11,4 +11,5 @@ var (
 	ErrLedgerFailure      = errors.New("decision ledger failure")
 	ErrEvaluationNotFound = errors.New("evaluation not found")
 	ErrIDGeneration       = errors.New("id generation failure")
+	ErrClockFailure       = errors.New("application clock failure")
 )
