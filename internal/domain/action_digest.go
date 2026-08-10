@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-const canonicalActionSchemaV1 = "agent-action-control/action-digest/v1"
+const CanonicalActionSchemaV1 = "agent-action-control/action-digest/v1"
 
 // CanonicalActionBytes serializes every security-relevant normalized action
 // fact into the versioned byte representation used by ComputeActionDigest.
@@ -39,7 +39,7 @@ func CanonicalActionBytes(action ProposedAction) ([]byte, error) {
 	}
 
 	value := canonicalAction{
-		Schema:      canonicalActionSchemaV1,
+		Schema:      CanonicalActionSchemaV1,
 		Type:        normalized.typ,
 		RequestedAt: normalized.requestedAt.UTC().Format(canonicalTimeFormat),
 		Actor: canonicalActor{
