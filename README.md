@@ -17,10 +17,9 @@ The first milestone implements the synchronous decision endpoint and its minimal
 ## Status
 
 Early development. The repository currently contains the service foundation,
-health endpoint, v1 HTTP contract, core decision model, and deterministic action
-normalizer. It also computes a versioned canonical SHA-256 digest over each
-normalized action. Decision orchestration and the public decision handler are
-not yet implemented.
+v1 decision endpoint, development runtime authentication, core decision model,
+deterministic action normalization and hashing, and an atomic SQLite decision
+ledger.
 
 The normalizer treats authenticated runtime identity as trusted context and the
 body `runtimeId` as an assertion: an omitted value is supplied from authentication,
@@ -42,10 +41,15 @@ at the execution boundary is a later integration responsibility.
 ## Run locally
 
 ```bash
+ACTION_CONTROL_RUNTIME_ID=runtime_456 \
+ACTION_CONTROL_RUNTIME_TOKEN=local-dev-token \
 go run ./cmd/action-control
 ```
 
-The server listens on `:8080` by default. Override it with `ACTION_CONTROL_ADDR`.
+The server listens on `:8080` and stores its local SQLite database at
+`data/action-control.db` by default. Override these with `ACTION_CONTROL_ADDR`
+and `ACTION_CONTROL_DB_PATH`. The static bearer credential is an M1 development
+adapter and is replaceable without changing the application or domain layers.
 
 ```bash
 curl http://localhost:8080/healthz
