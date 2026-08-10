@@ -91,6 +91,7 @@ func TestApplicationErrorTaxonomyIsDistinct(t *testing.T) {
 		ErrLedgerFailure,
 		ErrEvaluationNotFound,
 		ErrIDGeneration,
+		ErrClockFailure,
 		domain.ErrInvariantViolation,
 	}
 	for index, target := range errorsToCheck {
