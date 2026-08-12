@@ -11,17 +11,22 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/yoyo-kid/agent-action-control/internal/application"
 	"github.com/yoyo-kid/agent-action-control/internal/auth"
 	"github.com/yoyo-kid/agent-action-control/internal/policy/embedded"
+	ospreypolicy "github.com/yoyo-kid/agent-action-control/internal/policy/osprey"
 	"github.com/yoyo-kid/agent-action-control/internal/storage/sqlite"
 	httptransport "github.com/yoyo-kid/agent-action-control/internal/transport/http"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const shutdownTimeout = 10 * time.Second
+const defaultOspreyTimeout = 2 * time.Second
 
 func main() {
 	if err := run(); err != nil {
@@ -41,6 +46,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configure runtime authentication: %w", err)
 	}
+	policyEvaluator, closePolicyEvaluator, err := configurePolicyEvaluator()
+	if err != nil {
+		return err
+	}
+	defer closePolicyEvaluator()
 
 	databasePath := os.Getenv("ACTION_CONTROL_DB_PATH")
 	if databasePath == "" {
@@ -58,7 +68,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	service, err := application.NewDecisionService(embedded.Evaluator{}, ledger, systemClock{}, randomIDGenerator{})
+	service, err := application.NewDecisionService(policyEvaluator, ledger, systemClock{}, randomIDGenerator{})
 	if err != nil {
 		return err
 	}
@@ -99,6 +109,51 @@ func run() error {
 	defer cancel()
 
 	return server.Shutdown(shutdownCtx)
+}
+
+func configurePolicyEvaluator() (application.PolicyEvaluator, func() error, error) {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("ACTION_CONTROL_POLICY_EVALUATOR")))
+	if mode == "" || mode == "embedded" {
+		return embedded.Evaluator{}, func() error { return nil }, nil
+	}
+	if mode != "osprey" {
+		return nil, nil, fmt.Errorf("unsupported policy evaluator %q", mode)
+	}
+	address := strings.TrimSpace(os.Getenv("ACTION_CONTROL_OSPREY_ADDRESS"))
+	policyVersion := strings.TrimSpace(os.Getenv("ACTION_CONTROL_OSPREY_POLICY_VERSION"))
+	if address == "" || policyVersion == "" {
+		return nil, nil, fmt.Errorf("Osprey address and policy version are required")
+	}
+	timeout := defaultOspreyTimeout
+	if configured := strings.TrimSpace(os.Getenv("ACTION_CONTROL_OSPREY_TIMEOUT")); configured != "" {
+		parsed, err := time.ParseDuration(configured)
+		if err != nil || parsed <= 0 {
+			return nil, nil, fmt.Errorf("invalid Osprey timeout %q", configured)
+		}
+		timeout = parsed
+	}
+	connection, err := grpc.NewClient(
+		address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("configure Osprey connection: %w", err)
+	}
+	coordinator, err := ospreypolicy.NewGRPCCoordinator(connection)
+	if err != nil {
+		_ = connection.Close()
+		return nil, nil, err
+	}
+	evaluator, err := ospreypolicy.NewEvaluator(ospreypolicy.Config{
+		Coordinator:   coordinator,
+		PolicyVersion: policyVersion,
+		Timeout:       timeout,
+	})
+	if err != nil {
+		_ = connection.Close()
+		return nil, nil, err
+	}
+	return evaluator, connection.Close, nil
 }
 
 type systemClock struct{}

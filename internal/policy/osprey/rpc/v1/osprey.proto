@@ -1,0 +1,33 @@
+// Wire-compatible subset of Osprey's synchronous coordinator API.
+// Source: github.com/roostorg/osprey at 1581a02 (Apache-2.0).
+syntax = "proto3";
+
+package osprey.rpc.osprey_coordinator.sync_action.v1;
+
+option go_package = "github.com/yoyo-kid/agent-action-control/internal/policy/osprey/rpc/v1;ospreyv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+message Verdicts {
+  uint64 action_id = 1;
+  string action_name = 2;
+  repeated string verdicts = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message ProcessActionRequest {
+  google.protobuf.UInt64Value action_id = 1;
+  string action_name = 2;
+  string action_data_json = 3;
+  reserved 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message ProcessActionResponse {
+  Verdicts verdicts = 2;
+}
+
+service OspreyCoordinatorSyncActionService {
+  rpc ProcessAction(ProcessActionRequest) returns (ProcessActionResponse);
+}
