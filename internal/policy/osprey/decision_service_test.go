@@ -13,8 +13,9 @@ func TestEvaluatorIntegratesWithDecisionServiceAndLedger(t *testing.T) {
 	verdicts := []string{
 		"require_delegator_approval.external_send",
 		"create_safety_review.secret_payload",
+		"create_safety_review.suspicious_destination",
 	}
-	evaluator := newTestEvaluator(t, &fakeCoordinator{response: validResponse(verdicts...)}, time.Second)
+	evaluator := newTestEvaluator(t, &fakeCoordinator{verdicts: verdicts}, time.Second)
 	ledger := &recordingLedger{}
 	service, err := application.NewDecisionService(
 		evaluator,
@@ -42,9 +43,13 @@ func TestEvaluatorIntegratesWithDecisionServiceAndLedger(t *testing.T) {
 		t.Fatalf("commits = %d", len(ledger.commits))
 	}
 	commit := ledger.commits[0]
-	if commit.PolicyVersion != testPolicyVersion || len(commit.MatchedRuleIDs) != 2 ||
-		commit.MatchedRuleIDs[0] != verdicts[0] || commit.MatchedRuleIDs[1] != verdicts[1] {
+	if commit.PolicyVersion != testPolicyVersion || len(commit.MatchedRuleIDs) != len(verdicts) {
 		t.Fatalf("policy audit fields = %#v", commit)
+	}
+	for index := range verdicts {
+		if commit.MatchedRuleIDs[index] != verdicts[index] {
+			t.Fatalf("policy audit fields = %#v", commit)
+		}
 	}
 	if len(commit.Effects) != 1 || commit.Effects[0].Effect.Type() != domain.PolicyEffectCreateSafetyReview {
 		t.Fatalf("effects = %#v", commit.Effects)

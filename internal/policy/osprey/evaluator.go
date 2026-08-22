@@ -11,8 +11,6 @@ import (
 	"github.com/yoyo-kid/agent-action-control/internal/domain"
 )
 
-const DefaultActionName = "agent_action_control.evaluate"
-
 const (
 	terminalDenyPrefix = "deny."
 	approvalPrefix     = "require_delegator_approval."
@@ -26,7 +24,6 @@ var _ application.PolicyEvaluator = (*Evaluator)(nil)
 type Config struct {
 	Coordinator   Coordinator
 	PolicyVersion string
-	ActionName    string
 	Timeout       time.Duration
 }
 
@@ -35,23 +32,17 @@ type Config struct {
 type Evaluator struct {
 	coordinator   Coordinator
 	policyVersion string
-	actionName    string
 	timeout       time.Duration
 }
 
 func NewEvaluator(config Config) (*Evaluator, error) {
 	policyVersion := strings.TrimSpace(config.PolicyVersion)
-	actionName := strings.TrimSpace(config.ActionName)
-	if actionName == "" {
-		actionName = DefaultActionName
-	}
 	if config.Coordinator == nil || policyVersion == "" || config.Timeout <= 0 {
 		return nil, fmt.Errorf("Osprey coordinator, policy version, and positive timeout are required")
 	}
 	return &Evaluator{
 		coordinator:   config.Coordinator,
 		policyVersion: policyVersion,
-		actionName:    actionName,
 		timeout:       config.Timeout,
 	}, nil
 }
@@ -66,15 +57,14 @@ func (evaluator *Evaluator) Evaluate(
 	}
 	callContext, cancel := context.WithTimeout(ctx, evaluator.timeout)
 	defer cancel()
-	response, err := evaluator.coordinator.ProcessAction(callContext, CoordinatorRequest{
-		ActionName:     evaluator.actionName,
+	verdicts, err := evaluator.coordinator.ProcessAction(callContext, CoordinatorRequest{
 		ActionDataJSON: string(actionJSON),
 		Timestamp:      action.RequestedAt(),
 	})
-	if err != nil || !response.HasVerdicts || response.ActionName != evaluator.actionName {
+	if err != nil {
 		return evaluator.failClosed(), nil
 	}
-	evaluation, err := evaluator.mapVerdicts(response.Verdicts)
+	evaluation, err := evaluator.mapVerdicts(verdicts)
 	if err != nil {
 		return evaluator.failClosed(), nil
 	}
@@ -84,6 +74,7 @@ func (evaluator *Evaluator) Evaluate(
 func (evaluator *Evaluator) mapVerdicts(verdicts []string) (application.PolicyEvaluation, error) {
 	evaluation := application.PolicyEvaluation{PolicyVersion: evaluator.policyVersion}
 	seen := make(map[string]struct{}, len(verdicts))
+	safetyReviewCreated := false
 	for _, verdict := range verdicts {
 		if _, exists := seen[verdict]; exists {
 			continue
@@ -108,11 +99,14 @@ func (evaluator *Evaluator) mapVerdicts(verdicts []string) (application.PolicyEv
 			if !validPolicyKey(strings.TrimPrefix(verdict, safetyReviewPrefix)) {
 				return application.PolicyEvaluation{}, fmt.Errorf("invalid safety review verdict")
 			}
-			effect, err := newSafetyReviewEffect()
-			if err != nil {
-				return application.PolicyEvaluation{}, err
+			if !safetyReviewCreated {
+				effect, err := newSafetyReviewEffect()
+				if err != nil {
+					return application.PolicyEvaluation{}, err
+				}
+				evaluation.Effects = append(evaluation.Effects, effect)
+				safetyReviewCreated = true
 			}
-			evaluation.Effects = append(evaluation.Effects, effect)
 		default:
 			return application.PolicyEvaluation{}, fmt.Errorf("unknown Osprey verdict")
 		}

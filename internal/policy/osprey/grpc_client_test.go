@@ -13,9 +13,67 @@ import (
 )
 
 func TestGRPCCoordinatorCallsSynchronousProcessAction(t *testing.T) {
+	coordinator := newTestGRPCCoordinator(t, &testSyncServer{})
+	timestamp := time.Date(2026, time.August, 12, 12, 0, 0, 0, time.UTC)
+	verdicts, err := coordinator.ProcessAction(context.Background(), CoordinatorRequest{
+		ActionDataJSON: `{"type":"EXTERNAL_SEND"}`,
+		Timestamp:      timestamp,
+	})
+	if err != nil {
+		t.Fatalf("process action: %v", err)
+	}
+	if len(verdicts) != 1 || verdicts[0] != "deny.actor_not_authorized" {
+		t.Fatalf("verdicts = %#v", verdicts)
+	}
+}
+
+func TestGRPCCoordinatorRejectsMalformedResponses(t *testing.T) {
+	tests := []struct {
+		name     string
+		response *ospreyv1.ProcessActionResponse
+	}{
+		{name: "missing verdict envelope", response: &ospreyv1.ProcessActionResponse{}},
+		{name: "mismatched action name", response: &ospreyv1.ProcessActionResponse{
+			Verdicts: &ospreyv1.Verdicts{ActionName: "other"},
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			coordinator := newTestGRPCCoordinator(t, &testSyncServer{response: test.response})
+			if _, err := coordinator.ProcessAction(context.Background(), CoordinatorRequest{
+				ActionDataJSON: `{}`,
+				Timestamp:      time.Now(),
+			}); err == nil {
+				t.Fatal("expected malformed response error")
+			}
+		})
+	}
+}
+
+type testSyncServer struct {
+	ospreyv1.UnimplementedOspreyCoordinatorSyncActionServiceServer
+	response *ospreyv1.ProcessActionResponse
+}
+
+func (server *testSyncServer) ProcessAction(
+	_ context.Context,
+	request *ospreyv1.ProcessActionRequest,
+) (*ospreyv1.ProcessActionResponse, error) {
+	if server.response != nil {
+		return server.response, nil
+	}
+	return &ospreyv1.ProcessActionResponse{Verdicts: &ospreyv1.Verdicts{
+		ActionName: request.ActionName,
+		Verdicts:   []string{"deny.actor_not_authorized"},
+		Timestamp:  request.Timestamp,
+	}}, nil
+}
+
+func newTestGRPCCoordinator(t *testing.T, service *testSyncServer) *GRPCCoordinator {
+	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
-	ospreyv1.RegisterOspreyCoordinatorSyncActionServiceServer(server, &testSyncServer{})
+	ospreyv1.RegisterOspreyCoordinatorSyncActionServiceServer(server, service)
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
 
@@ -34,32 +92,5 @@ func TestGRPCCoordinatorCallsSynchronousProcessAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new coordinator: %v", err)
 	}
-	timestamp := time.Date(2026, time.August, 12, 12, 0, 0, 0, time.UTC)
-	response, err := coordinator.ProcessAction(context.Background(), CoordinatorRequest{
-		ActionName:     DefaultActionName,
-		ActionDataJSON: `{"type":"EXTERNAL_SEND"}`,
-		Timestamp:      timestamp,
-	})
-	if err != nil {
-		t.Fatalf("process action: %v", err)
-	}
-	if !response.HasVerdicts || response.ActionName != DefaultActionName ||
-		len(response.Verdicts) != 1 || response.Verdicts[0] != "deny.actor_not_authorized" {
-		t.Fatalf("response = %#v", response)
-	}
-}
-
-type testSyncServer struct {
-	ospreyv1.UnimplementedOspreyCoordinatorSyncActionServiceServer
-}
-
-func (*testSyncServer) ProcessAction(
-	_ context.Context,
-	request *ospreyv1.ProcessActionRequest,
-) (*ospreyv1.ProcessActionResponse, error) {
-	return &ospreyv1.ProcessActionResponse{Verdicts: &ospreyv1.Verdicts{
-		ActionName: request.ActionName,
-		Verdicts:   []string{"deny.actor_not_authorized"},
-		Timestamp:  request.Timestamp,
-	}}, nil
+	return coordinator
 }

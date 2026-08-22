@@ -66,14 +66,18 @@ func TestEvaluatorMapsSupportedVerdictFamilies(t *testing.T) {
 			wantReasons: []domain.ReasonCode{domain.ReasonDelegatorApprovalRequired},
 			wantEffects: 1,
 		},
+		{
+			name: "distinct safety review signals share one effect",
+			verdicts: []string{
+				"create_safety_review.secret_payload",
+				"create_safety_review.suspicious_destination",
+			},
+			wantEffects: 1,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			coordinator := &fakeCoordinator{response: CoordinatorResponse{
-				HasVerdicts: true,
-				ActionName:  DefaultActionName,
-				Verdicts:    test.verdicts,
-			}}
+			coordinator := &fakeCoordinator{verdicts: test.verdicts}
 			evaluator := newTestEvaluator(t, coordinator, time.Second)
 			evaluation, err := evaluator.Evaluate(context.Background(), testAction(t))
 			if err != nil {
@@ -103,20 +107,18 @@ func TestEvaluatorFailsClosedForUncertainPolicyResults(t *testing.T) {
 	coordinatorFailure := errors.New("coordinator unavailable")
 	tests := []struct {
 		name     string
-		response CoordinatorResponse
+		verdicts []string
 		err      error
 	}{
 		{name: "coordinator unavailable", err: coordinatorFailure},
-		{name: "missing verdict envelope"},
-		{name: "mismatched action name", response: CoordinatorResponse{HasVerdicts: true, ActionName: "other"}},
-		{name: "unknown verdict", response: validResponse("block.everything")},
-		{name: "unknown deny reason", response: validResponse("deny.not_registered")},
-		{name: "empty approval key", response: validResponse("require_delegator_approval.")},
-		{name: "noncanonical policy key", response: validResponse("create_safety_review.Secret")},
+		{name: "unknown verdict", verdicts: []string{"block.everything"}},
+		{name: "unknown deny reason", verdicts: []string{"deny.not_registered"}},
+		{name: "empty approval key", verdicts: []string{"require_delegator_approval."}},
+		{name: "noncanonical policy key", verdicts: []string{"create_safety_review.Secret"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			evaluator := newTestEvaluator(t, &fakeCoordinator{response: test.response, err: test.err}, time.Second)
+			evaluator := newTestEvaluator(t, &fakeCoordinator{verdicts: test.verdicts, err: test.err}, time.Second)
 			evaluation, err := evaluator.Evaluate(context.Background(), testAction(t))
 			if err != nil {
 				t.Fatalf("evaluate: %v", err)
@@ -130,9 +132,9 @@ func TestEvaluatorFailsClosedForUncertainPolicyResults(t *testing.T) {
 }
 
 func TestEvaluatorAppliesCoordinatorTimeout(t *testing.T) {
-	coordinator := &fakeCoordinator{process: func(ctx context.Context, _ CoordinatorRequest) (CoordinatorResponse, error) {
+	coordinator := &fakeCoordinator{process: func(ctx context.Context, _ CoordinatorRequest) ([]string, error) {
 		<-ctx.Done()
-		return CoordinatorResponse{}, ctx.Err()
+		return nil, ctx.Err()
 	}}
 	evaluator := newTestEvaluator(t, coordinator, time.Millisecond)
 	evaluation, err := evaluator.Evaluate(context.Background(), testAction(t))
@@ -143,7 +145,7 @@ func TestEvaluatorAppliesCoordinatorTimeout(t *testing.T) {
 }
 
 func TestEvaluatorSendsNormalizedActionFacts(t *testing.T) {
-	coordinator := &fakeCoordinator{response: validResponse()}
+	coordinator := &fakeCoordinator{}
 	evaluator := newTestEvaluator(t, coordinator, time.Second)
 	action := testAction(t)
 	if _, err := evaluator.Evaluate(context.Background(), action); err != nil {
@@ -153,7 +155,7 @@ func TestEvaluatorSendsNormalizedActionFacts(t *testing.T) {
 		t.Fatalf("requests = %d", len(coordinator.requests))
 	}
 	request := coordinator.requests[0]
-	if request.ActionName != DefaultActionName || !request.Timestamp.Equal(action.RequestedAt()) {
+	if !request.Timestamp.Equal(action.RequestedAt()) {
 		t.Fatalf("request = %#v", request)
 	}
 	var facts map[string]any
@@ -170,21 +172,21 @@ func TestEvaluatorSendsNormalizedActionFacts(t *testing.T) {
 }
 
 type fakeCoordinator struct {
-	response CoordinatorResponse
+	verdicts []string
 	err      error
 	requests []CoordinatorRequest
-	process  func(context.Context, CoordinatorRequest) (CoordinatorResponse, error)
+	process  func(context.Context, CoordinatorRequest) ([]string, error)
 }
 
 func (coordinator *fakeCoordinator) ProcessAction(
 	ctx context.Context,
 	request CoordinatorRequest,
-) (CoordinatorResponse, error) {
+) ([]string, error) {
 	coordinator.requests = append(coordinator.requests, request)
 	if coordinator.process != nil {
 		return coordinator.process(ctx, request)
 	}
-	return coordinator.response, coordinator.err
+	return coordinator.verdicts, coordinator.err
 }
 
 func newTestEvaluator(t *testing.T, coordinator Coordinator, timeout time.Duration) *Evaluator {
@@ -198,10 +200,6 @@ func newTestEvaluator(t *testing.T, coordinator Coordinator, timeout time.Durati
 		t.Fatalf("new evaluator: %v", err)
 	}
 	return evaluator
-}
-
-func validResponse(verdicts ...string) CoordinatorResponse {
-	return CoordinatorResponse{HasVerdicts: true, ActionName: DefaultActionName, Verdicts: verdicts}
 }
 
 func testAction(t *testing.T) domain.ProposedAction {
