@@ -148,7 +148,7 @@ func encodeEvaluation(commit application.EvaluationCommit) (encodedEvaluation, e
 
 	reasonCodesJSON, _ := json.Marshal(reasonValues)
 	requiredActionsJSON, _ := json.Marshal(requiredActionValues)
-	matchedRuleIDsJSON, _ := json.Marshal(append([]string(nil), commit.MatchedRuleIDs...))
+	matchedRuleIDsJSON, _ := json.Marshal(append([]string{}, commit.MatchedRuleIDs...))
 	effects, err := encodeEffects(commit)
 	if err != nil {
 		return encodedEvaluation{}, err

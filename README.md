@@ -97,6 +97,8 @@ make verify
 
 This checks formatting, runs `go vet`, and executes the test suite with the race detector.
 
+For a runnable first request, follow the [embedded-policy quickstart](examples/README.md). The Milestone 1 end-to-end acceptance suite can be run independently with `go test -race ./tests`.
+
 ## Repository layout
 
 ```text
